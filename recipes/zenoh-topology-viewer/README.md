@@ -24,7 +24,7 @@ The configured `pdu_size` is 256 KiB and is used as bridge receive capacity. The
 
 This Recipe depends on the Bridge behavior that forwards only `received_size` bytes for variable-length PDU payloads.
 
-## Bridge
+## 1. Start the Bridge
 
 Assuming `hakoniwa-pdu-bridge` is installed:
 
@@ -36,14 +36,7 @@ hakoniwa-pdu-bridge \
   zenoh_topology_bridge
 ```
 
-## Collector
-
-```bash
-hako-zenoh-topology-collector \
-  --endpoint-config recipes/zenoh-topology-viewer/config/endpoint/collector-out.json
-```
-
-## Browser
+## 2. Start the Browser and connect WebSocket
 
 ```bash
 cd web
@@ -52,3 +45,14 @@ npm run dev
 ```
 
 Open the Vite URL, keep `ws://127.0.0.1:8765`, and press **Connect**.
+
+The browser should be connected before the current one-shot collector publishes its snapshot.
+
+## 3. Run the Collector
+
+```bash
+hako-zenoh-topology-collector \
+  --endpoint-config recipes/zenoh-topology-viewer/config/endpoint/collector-out.json
+```
+
+The collector currently publishes one snapshot and exits. Realtime/event-driven collection is a follow-up step.
