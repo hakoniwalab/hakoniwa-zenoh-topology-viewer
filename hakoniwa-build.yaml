@@ -16,4 +16,5 @@ validation:
 paths:
   zenohc_root: ""
   pdu_endpoint_root: ""
+  pdu_registry_root: ""
   pdu_javascript_root: ""

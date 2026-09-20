@@ -1,3 +1,4 @@
+import { PduTopologySource } from './pdu-topology-source.js';
 import { TopologyView } from './topology-view.js';
 
 const elements = {
@@ -9,16 +10,22 @@ const elements = {
   linkCount: document.querySelector('#link-count'),
   schemaName: document.querySelector('#schema-name'),
   timestamp: document.querySelector('#timestamp'),
-  fitButton: document.querySelector('#fit-button'),
-  reloadButton: document.querySelector('#reload-button')
+  wsUri: document.querySelector('#ws-uri'),
+  connectButton: document.querySelector('#connect-button'),
+  sampleButton: document.querySelector('#sample-button'),
+  fitButton: document.querySelector('#fit-button')
 };
 
 const view = new TopologyView(elements.graph, elements.details);
+const source = new PduTopologySource({
+  onSnapshot: renderSnapshot,
+  onStatus: setStatus
+});
 
 async function loadSample() {
-  setStatus('loading');
+  setStatus('loading sample');
   try {
-    const response = await fetch('./sample-topology.json', { cache: 'no-store' });
+    const response = await fetch('/sample-topology.json', { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -27,6 +34,14 @@ async function loadSample() {
     setStatus('sample');
   } catch (error) {
     setStatus('error');
+    elements.details.textContent = String(error);
+  }
+}
+
+async function connectLive() {
+  try {
+    await source.connect(elements.wsUri.value.trim());
+  } catch (error) {
     elements.details.textContent = String(error);
   }
 }
@@ -44,12 +59,11 @@ function setStatus(text) {
   elements.status.textContent = text;
 }
 
+elements.connectButton.addEventListener('click', connectLive);
+elements.sampleButton.addEventListener('click', async () => {
+  await source.disconnect();
+  await loadSample();
+});
 elements.fitButton.addEventListener('click', () => view.fit());
-elements.reloadButton.addEventListener('click', () => loadSample());
 
 loadSample();
-
-// Future PDU integration should call renderSnapshot(snapshot) after:
-// 1. WebSocket receive via hakoniwa-pdu-javascript
-// 2. std_msgs/String CDR decode
-// 3. JSON.parse(pdu.data)

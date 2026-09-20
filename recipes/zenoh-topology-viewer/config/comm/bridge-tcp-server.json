@@ -1,0 +1,11 @@
+{
+  "protocol": "tcp",
+  "name": "zenoh_topology_bridge_tcp_server",
+  "direction": "in",
+  "role": "server",
+  "comm_raw_version": "v2",
+  "local": {
+    "address": "0.0.0.0",
+    "port": 9101
+  }
+}

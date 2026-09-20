@@ -8,13 +8,27 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(HAKO_ZENOH_TOPOLOGY_BUILD_TESTS "Build collector unit tests" ON)
+set(HAKO_PDU_REGISTRY_ROOT "" CACHE PATH "Path to hakoniwa-pdu-registry source tree")
 
 find_package(zenohc CONFIG REQUIRED)
+find_package(hakoniwa_pdu_endpoint CONFIG REQUIRED)
+find_package(fastcdr CONFIG REQUIRED)
 
 if(NOT ZENOHC_BUILD_WITH_UNSTABLE_API)
     message(FATAL_ERROR
         "zenoh-c must be built with ZENOHC_BUILD_WITH_UNSTABLE_API=true "
         "because the Connectivity API is currently unstable.")
+endif()
+
+if(NOT HAKO_PDU_REGISTRY_ROOT)
+    message(FATAL_ERROR
+        "HAKO_PDU_REGISTRY_ROOT is required to use the generated std_msgs/String CDR converter.")
+endif()
+
+set(HAKO_PDU_TYPES_DIR "${HAKO_PDU_REGISTRY_ROOT}/pdu/types")
+if(NOT EXISTS "${HAKO_PDU_TYPES_DIR}/std_msgs/pdu_cpptype_cdr_conv_String.hpp")
+    message(FATAL_ERROR
+        "std_msgs/String CDR converter was not found under HAKO_PDU_REGISTRY_ROOT=${HAKO_PDU_REGISTRY_ROOT}")
 endif()
 
 add_library(hako_zenoh_topology_model
@@ -29,11 +43,13 @@ target_include_directories(hako_zenoh_topology_model
 add_executable(hako-zenoh-topology-collector
     src/main.cpp
     src/zenoh_collector.cpp
+    src/topology_pdu_publisher.cpp
 )
 
 target_include_directories(hako-zenoh-topology-collector
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${HAKO_PDU_TYPES_DIR}
 )
 
 target_compile_definitions(hako-zenoh-topology-collector
@@ -52,6 +68,8 @@ target_link_libraries(hako-zenoh-topology-collector
     PRIVATE
         hako_zenoh_topology_model
         zenohc::shared
+        hakoniwa_pdu_endpoint::hakoniwa_pdu_endpoint
+        fastcdr
 )
 
 install(TARGETS hako-zenoh-topology-collector

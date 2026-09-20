@@ -14,41 +14,55 @@ docs/        Architecture notes
 prebuilt/    Prebuilt distribution metadata/artifacts
 ```
 
-## Initial collector
+## Runtime architecture
 
-The first collector implementation prints one local connectivity snapshot as JSON.
-
-It uses the Zenoh Connectivity API, which is currently exposed by `zenoh-c` as an unstable API. Build zenoh-c with:
-
-```bash
-cmake -S . -B build \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DZENOHC_BUILD_WITH_UNSTABLE_API=true \
-  -DCMAKE_INSTALL_PREFIX=/path/to/zenoh-c-install
-cmake --build build --config Release
-cmake --install build --config Release
+```text
+Zenoh
+  -> C++ Topology Collector
+  -> std_msgs/String / CDR (JSON payload)
+  -> hakoniwa-pdu-endpoint
+  -> TCP
+  -> hakoniwa-pdu-bridge-core
+  -> WebSocket / CDR
+  -> hakoniwa-pdu-javascript
+  -> JSON.parse()
+  -> Cytoscape.js
 ```
 
-Then build the collector:
+The bridge-side `pdu_size` is a receive-capacity bound. The actual CDR string payload remains variable length.
+
+## Collector build dependencies
+
+- zenoh-c built with `ZENOHC_BUILD_WITH_UNSTABLE_API=true`
+- hakoniwa-pdu-endpoint
+- Fast-CDR
+- hakoniwa-pdu-registry source tree for the generated `std_msgs/String` CDR converter
+
+Example:
 
 ```bash
 cmake -S collector -B collector/build \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH=/path/to/zenoh-c-install
+  -DCMAKE_PREFIX_PATH="/path/to/zenoh-c-install;/path/to/hakoniwa-foundation-install" \
+  -DHAKO_PDU_REGISTRY_ROOT=/path/to/hakoniwa-pdu-registry
+
 cmake --build collector/build
 ctest --test-dir collector/build --output-on-failure
 ```
 
-Run:
+## Collector output
+
+Stdout only:
 
 ```bash
 ./collector/build/hako-zenoh-topology-collector
 ```
 
-Or use a Zenoh JSON5 config:
+Publish the same JSON through Hakoniwa PDU Endpoint:
 
 ```bash
-./collector/build/hako-zenoh-topology-collector --config ./zenoh.json5
+./collector/build/hako-zenoh-topology-collector \
+  --endpoint-config recipes/zenoh-topology-viewer/config/endpoint/collector-out.json
 ```
 
-The MVP transports a topology snapshot as JSON inside `std_msgs/String`, encoded with CDR and delivered through Hakoniwa PDU Endpoint / Bridge to the browser. The PDU output is a follow-up step; this collector PR validates Zenoh connectivity discovery and JSON serialization first.
+See `recipes/zenoh-topology-viewer/README.md` for the end-to-end path.
