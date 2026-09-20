@@ -1,0 +1,46 @@
+{
+  "schema": "hakoniwa.zenoh.topology/v1",
+  "timestamp": 1726790000123,
+  "collector": { "zid": "collector-peer-a" },
+  "nodes": [
+    { "zid": "collector-peer-a", "mode": "peer" },
+    { "zid": "router-r", "mode": "router" },
+    { "zid": "client-c", "mode": "client" }
+  ],
+  "transports": [
+    {
+      "remote_zid": "router-r",
+      "remote_mode": "router",
+      "qos": true,
+      "multicast": false
+    },
+    {
+      "remote_zid": "client-c",
+      "remote_mode": "client",
+      "qos": true,
+      "multicast": false
+    }
+  ],
+  "links": [
+    {
+      "remote_zid": "router-r",
+      "protocol": "tcp",
+      "src_endpoint": "tcp/172.30.0.10:55200",
+      "dst_endpoint": "tcp/172.40.0.10:7447",
+      "mtu": 65535,
+      "streamed": true,
+      "interfaces": ["eth0"],
+      "reliability": "reliable"
+    },
+    {
+      "remote_zid": "client-c",
+      "protocol": "tcp",
+      "src_endpoint": "tcp/172.30.0.10:55210",
+      "dst_endpoint": "tcp/172.30.0.11:7447",
+      "mtu": 65535,
+      "streamed": true,
+      "interfaces": ["eth0"],
+      "reliability": "reliable"
+    }
+  ]
+}

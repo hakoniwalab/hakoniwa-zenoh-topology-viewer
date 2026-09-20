@@ -10,7 +10,8 @@
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {
-    "cytoscape": "^3.33.1"
+    "cytoscape": "^3.33.1",
+    "hakoniwa-pdu-javascript": "^1.0.0"
   },
   "devDependencies": {
     "vite": "^7.1.5"

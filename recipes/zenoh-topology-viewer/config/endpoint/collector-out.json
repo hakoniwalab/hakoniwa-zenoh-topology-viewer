@@ -1,0 +1,6 @@
+{
+  "name": "zenoh-topology-collector-out",
+  "pdu_def_path": "../pdu/pdudef.json",
+  "cache": "../cache/latest.json",
+  "comm": "../comm/collector-tcp-client.json"
+}
