@@ -1,16 +1,45 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hakoniwa Zenoh Topology Viewer</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <main>
-    <h1>Hakoniwa Zenoh Topology Viewer</h1>
-    <p id="status">project skeleton</p>
-    <div id="topology"></div>
+  <main class="app-shell">
+    <header class="toolbar">
+      <div>
+        <p class="eyebrow">Hakoniwa</p>
+        <h1>Zenoh Topology Viewer</h1>
+      </div>
+      <div class="toolbar-actions">
+        <button id="fit-button" type="button">Fit</button>
+        <button id="reload-button" type="button">Reload sample</button>
+      </div>
+    </header>
+
+    <section class="summary" aria-label="Topology summary">
+      <div><strong id="node-count">0</strong><span>nodes</span></div>
+      <div><strong id="transport-count">0</strong><span>transports</span></div>
+      <div><strong id="link-count">0</strong><span>links</span></div>
+      <div class="status-wrap"><span id="status" class="status">loading</span></div>
+    </section>
+
+    <section class="viewer-layout">
+      <div id="topology" class="topology" aria-label="Zenoh topology graph"></div>
+      <aside class="details" aria-live="polite">
+        <h2>Details</h2>
+        <pre id="details">Select a node or link.</pre>
+      </aside>
+    </section>
+
+    <footer>
+      <span id="schema-name">schema: -</span>
+      <span id="timestamp">timestamp: -</span>
+    </footer>
   </main>
+
   <script type="module" src="./main.js"></script>
 </body>
 </html>
