@@ -1,0 +1,6 @@
+{
+  "name": "zenoh-topology-bridge-tcp-in",
+  "pdu_def_path": "pdudef.json",
+  "cache": "pdu-cache.json",
+  "comm": "bridge-tcp.json"
+}

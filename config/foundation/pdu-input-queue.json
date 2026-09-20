@@ -1,0 +1,5 @@
+{
+  "type": "buffer",
+  "name": "zenoh_topology_input_queue",
+  "store": { "mode": "queue", "depth": 16 }
+}

@@ -3,6 +3,7 @@ version: 1
 build:
   type: Release
   dir: collector/build
+  parallel: 0
 
 components:
   collector: true

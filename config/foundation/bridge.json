@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "transferPolicies": {
+    "immediate": { "type": "immediate" }
+  },
+  "nodes": [
+    { "id": "zenoh_topology_bridge" }
+  ],
+  "endpoints_config_path": "endpoint-container.json",
+  "wireLinks": [],
+  "pduKeyGroups": {
+    "topology_snapshot": [
+      { "id": "ZenohTopology.topology", "robot_name": "ZenohTopology", "pdu_name": "topology" }
+    ]
+  },
+  "connections": [
+    {
+      "id": "collector_to_browser",
+      "nodeId": "zenoh_topology_bridge",
+      "source": { "endpointId": "collector_in" },
+      "destinations": [
+        { "endpointId": "browser_out" }
+      ],
+      "transferPdus": [
+        { "pduKeyGroupId": "topology_snapshot", "policyId": "immediate" }
+      ]
+    }
+  ]
+}

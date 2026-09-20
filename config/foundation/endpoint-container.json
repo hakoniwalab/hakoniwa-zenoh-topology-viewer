@@ -1,0 +1,9 @@
+[
+  {
+    "nodeId": "zenoh_topology_bridge",
+    "endpoints": [
+      { "id": "collector_in", "mode": "local", "config_path": "bridge-tcp-in.json", "direction": "in" },
+      { "id": "browser_out", "mode": "local", "config_path": "bridge-ws-out.json", "direction": "inout" }
+    ]
+  }
+]

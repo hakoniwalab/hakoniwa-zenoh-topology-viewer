@@ -1,0 +1,6 @@
+{
+  "name": "zenoh-topology-bridge-ws-out",
+  "pdu_def_path": "pdudef.json",
+  "cache": "pdu-cache.json",
+  "comm": "browser-websocket.json"
+}

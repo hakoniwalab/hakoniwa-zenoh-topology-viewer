@@ -1,0 +1,8 @@
+{
+  "protocol": "tcp",
+  "name": "zenoh_topology_collector_client",
+  "direction": "out",
+  "role": "client",
+  "comm_raw_version": "v2",
+  "remote": { "address": "127.0.0.1", "port": 9101 }
+}

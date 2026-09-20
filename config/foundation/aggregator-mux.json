@@ -1,0 +1,6 @@
+{
+  "name": "zenoh-topology-agent-mux",
+  "pdu_def_path": "pdudef.json",
+  "cache": "pdu-input-queue.json",
+  "comm": "aggregator-mux-tcp.json"
+}

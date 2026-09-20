@@ -1,0 +1,8 @@
+{
+  "protocol": "tcp",
+  "name": "zenoh_topology_agent_mux",
+  "direction": "in",
+  "comm_raw_version": "v2",
+  "local": { "address": "0.0.0.0", "port": 9200 },
+  "expected_clients": 2
+}

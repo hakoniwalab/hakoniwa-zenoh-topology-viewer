@@ -1,0 +1,8 @@
+{
+  "paths": [
+    { "id": "topology_types", "path": "topology-pdutypes.json" }
+  ],
+  "robots": [
+    { "name": "ZenohTopology", "pdutypes_id": "topology_types" }
+  ]
+}

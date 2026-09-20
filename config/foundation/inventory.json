@@ -1,0 +1,10 @@
+{
+  "schema": "hakoniwa.zenoh.inventory/v1",
+  "refresh_interval_ms": 1000,
+  "stale_after_ms": 5000,
+  "endpoint_mux_config": "aggregator-mux.json",
+  "targets": [
+    { "name": "node-a-peer", "role": "peer", "expected_zid": "a" },
+    { "name": "node-b-peer", "role": "peer", "expected_zid": "b" }
+  ]
+}
