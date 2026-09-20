@@ -45,6 +45,7 @@ struct ObservationSource {
     std::string zid;
     std::string status{"ok"};
     std::string error;
+    std::optional<std::uint64_t> last_received_at_ms;
 };
 
 struct TopologySnapshot {

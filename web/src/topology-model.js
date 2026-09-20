@@ -11,6 +11,17 @@ export function normalizeTopology(snapshot) {
   const nodes = Array.isArray(snapshot.nodes) ? snapshot.nodes : [];
   const transports = Array.isArray(snapshot.transports) ? snapshot.transports : [];
   const links = Array.isArray(snapshot.links) ? snapshot.links : [];
+  const sources = Array.isArray(snapshot.sources) ? snapshot.sources : [];
+  const staleZids = new Set(
+    sources.filter((source) => source.status === 'stale' && source.zid).map((source) => source.zid)
+  );
+
+  function isStale(item, source) {
+    const observers = Array.isArray(item.observed_by) && item.observed_by.length > 0
+      ? item.observed_by
+      : [source];
+    return observers.length > 0 && observers.every((zid) => staleZids.has(zid));
+  }
 
   const nodeByZid = new Map();
 
@@ -48,7 +59,11 @@ export function normalizeTopology(snapshot) {
     collectorZid,
     nodes: [...nodeByZid.values()],
     transports,
-    links
+    links,
+    status: snapshot.status ?? 'complete',
+    sources,
+    staleZids,
+    isStale
   };
 }
 
@@ -62,7 +77,8 @@ export function toCytoscapeElements(snapshot) {
       label: shortZid(node.zid),
       zid: node.zid,
       mode: node.mode || 'unknown',
-      collector: node.zid === topology.collectorZid
+      collector: node.zid === topology.collectorZid,
+      stale: topology.staleZids.has(node.zid)
     }
   }));
 
@@ -86,6 +102,7 @@ export function toCytoscapeElements(snapshot) {
         target,
         label: protocol,
         kind: topology.links.length > 0 ? 'link' : 'transport',
+        stale: topology.isStale(item, source),
         raw: item
       }
     });

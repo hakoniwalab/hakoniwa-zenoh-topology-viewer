@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "topology_json.hpp"
 #include "topology_aggregator.hpp"
@@ -46,6 +47,13 @@ std::string read_text_file(const std::string& path)
         throw std::runtime_error("topology input file is empty: " + path);
     }
     return content.str();
+}
+
+std::uint64_t system_now_ms()
+{
+    using namespace std::chrono;
+    return static_cast<std::uint64_t>(
+        duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count());
 }
 
 Options parse_args(int argc, char** argv)
@@ -125,9 +133,13 @@ int main(int argc, char** argv)
         }
         std::vector<std::unique_ptr<hako::zenoh_topology::TopologyPduSubscriber>> subscribers;
         std::vector<std::optional<hako::zenoh_topology::TopologySnapshot>> latest_observations;
+        std::vector<std::optional<std::chrono::steady_clock::time_point>> last_received_times;
+        std::vector<std::optional<std::uint64_t>> last_received_at_ms;
         if (inventory.has_value()) {
             subscribers.reserve(inventory->targets.size());
             latest_observations.resize(inventory->targets.size());
+            last_received_times.resize(inventory->targets.size());
+            last_received_at_ms.resize(inventory->targets.size());
             for (const auto& target : inventory->targets) {
                 auto subscriber = std::make_unique<hako::zenoh_topology::TopologyPduSubscriber>(
                     target.endpoint_config);
@@ -159,9 +171,24 @@ int main(int argc, char** argv)
                                     + ", received " + snapshot.collector_zid);
                             }
                             latest_observations[i] = std::move(snapshot);
+                            last_received_times[i] = std::chrono::steady_clock::now();
+                            last_received_at_ms[i] = system_now_ms();
                         }
                         if (latest_observations[i].has_value()) {
-                            observations.push_back({target, *latest_observations[i]});
+                            const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - *last_received_times[i]).count();
+                            if (elapsed_ms >= static_cast<std::int64_t>(inventory->stale_after_ms)) {
+                                observations.push_back({
+                                    target,
+                                    *latest_observations[i],
+                                    "stale",
+                                    "no topology PDU received for " + std::to_string(elapsed_ms) + " ms",
+                                    last_received_at_ms[i],
+                                });
+                            } else {
+                                observations.push_back({
+                                    target, *latest_observations[i], "ok", "", last_received_at_ms[i]});
+                            }
                         } else {
                             failures.push_back({target.name, target.role, target.endpoint_config,
                                                 "", "waiting", "no topology PDU received yet"});

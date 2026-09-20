@@ -25,13 +25,20 @@ services:
       - sh
       - -c
       - |
-        cp -R /src/. /tmp/web
-        cd /tmp/web
+        set -eu
+        build_root="$$(mktemp -d)"
+        web_dir="$${build_root}/hakoniwa-zenoh-topology-viewer/web"
+        mkdir -p "$${web_dir}"
+        cp /src/package.json /src/index.html /src/vite.config.js "$${web_dir}/"
+        cp -R /src/src /src/public "$${web_dir}/"
+        ln -s /pdu-js "$${build_root}/hakoniwa-pdu-javascript"
+        cd "$${web_dir}"
         npm install --no-package-lock --no-audit --no-fund
         npm run build
         cp -R dist/. /web-dist/
     volumes:
       - ../web:/src:ro
+      - ../../hakoniwa-pdu-javascript:/pdu-js:ro
       - ../.docker-web-dist:/web-dist
 
   node_a:
@@ -58,7 +65,12 @@ services:
       topology_net:
         ipv4_address: 172.31.0.10
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 9201 && nc -z 127.0.0.1 9202 && nc -z 127.0.0.1 5173"]
+      test:
+        - CMD-SHELL
+        - >-
+          grep -q '00000000:23F1 .* 0A ' /proc/net/tcp &&
+          grep -q '00000000:23F2 .* 0A ' /proc/net/tcp &&
+          curl -fsS http://127.0.0.1:5173/ >/dev/null
       interval: 2s
       timeout: 1s
       retries: 30
@@ -84,7 +96,7 @@ services:
       topology_net:
         ipv4_address: 172.31.0.20
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 7447"]
+      test: ["CMD-SHELL", "grep -q '00000000:1D17 .* 0A ' /proc/net/tcp"]
       interval: 2s
       timeout: 1s
       retries: 30

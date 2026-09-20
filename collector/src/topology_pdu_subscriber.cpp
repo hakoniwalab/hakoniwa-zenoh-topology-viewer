@@ -1,11 +1,9 @@
 #include "topology_pdu_subscriber.hpp"
 
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <span>
 #include <stdexcept>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -32,26 +30,25 @@ void TopologyPduSubscriber::start()
     if (endpoint_->open(endpoint_config_path_) != HAKO_PDU_ERR_OK) {
         throw std::runtime_error("failed to open aggregator input endpoint: " + endpoint_config_path_);
     }
+    const hakoniwa::pdu::PduKey key{"ZenohTopology", "topology"};
+    pdu_size_ = endpoint_->get_pdu_size(key);
+    if (pdu_size_ == 0) {
+        (void)endpoint_->close();
+        throw std::runtime_error("topology PDU definition was not found: " + endpoint_config_path_);
+    }
     if (endpoint_->start() != HAKO_PDU_ERR_OK) {
         (void)endpoint_->close();
         throw std::runtime_error("failed to start aggregator input endpoint: " + endpoint_config_path_);
     }
-    bool running = false;
-    for (int i = 0; i < 50; ++i) {
-        if (endpoint_->is_running(running) == HAKO_PDU_ERR_OK && running) {
-            started_ = true;
-            return;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    stop();
-    throw std::runtime_error("aggregator input endpoint did not become ready: " + endpoint_config_path_);
+    // This input endpoint is a TCP server. Listening successfully is enough to
+    // make the aggregator ready; is_running() also requires a connected client.
+    started_ = true;
 }
 
 std::optional<std::string> TopologyPduSubscriber::receive_json()
 {
     if (!started_) throw std::runtime_error("aggregator input endpoint is not started");
-    std::vector<std::byte> buffer(256U * 1024U);
+    std::vector<std::byte> buffer(pdu_size_);
     std::size_t received_size = 0;
     const hakoniwa::pdu::PduKey key{"ZenohTopology", "topology"};
     const auto err = endpoint_->recv(key, std::span<std::byte>(buffer.data(), buffer.size()), received_size);

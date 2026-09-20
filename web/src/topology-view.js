@@ -42,6 +42,14 @@ export class TopologyView {
           }
         },
         {
+          selector: 'node[?stale]',
+          style: {
+            'opacity': 0.55,
+            'border-width': 3,
+            'border-color': '#dc2626'
+          }
+        },
+        {
           selector: 'edge',
           style: {
             'curve-style': 'bezier',
@@ -54,6 +62,15 @@ export class TopologyView {
             'text-background-color': '#ffffff',
             'text-background-opacity': 0.9,
             'text-background-padding': 2
+          }
+        },
+        {
+          selector: 'edge[?stale]',
+          style: {
+            'line-style': 'dashed',
+            'line-color': '#dc2626',
+            'target-arrow-color': '#dc2626',
+            'opacity': 0.6
           }
         },
         {
@@ -89,7 +106,9 @@ export class TopologyView {
       collector_zid: topology.collectorZid,
       nodes: topology.nodes.length,
       transports: topology.transports.length,
-      links: topology.links.length
+      links: topology.links.length,
+      status: topology.status,
+      sources: topology.sources
     });
     return topology;
   }

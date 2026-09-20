@@ -57,6 +57,9 @@ json source_json(const ObservationSource& value)
         {"zid", value.zid}, {"status", value.status},
     };
     if (!value.error.empty()) result["error"] = value.error;
+    if (value.last_received_at_ms.has_value()) {
+        result["last_received_at"] = *value.last_received_at_ms;
+    }
     return result;
 }
 
@@ -99,6 +102,18 @@ TopologySnapshot topology_from_json(const std::string& input)
         snapshot.timestamp_ms = root.value("timestamp", std::uint64_t{0});
         if (root.contains("collector")) snapshot.collector_zid = root.at("collector").value("zid", "");
         snapshot.status = root.value("status", "complete");
+
+        for (const auto& value : root.value("sources", json::array())) {
+            ObservationSource source;
+            source.name = value.at("name").get<std::string>();
+            source.role = value.value("role", "");
+            source.endpoint = value.value("endpoint", "");
+            source.zid = value.value("zid", "");
+            source.status = value.value("status", "ok");
+            source.error = value.value("error", "");
+            source.last_received_at_ms = optional_value<std::uint64_t>(value, "last_received_at");
+            snapshot.sources.push_back(std::move(source));
+        }
 
         for (const auto& value : root.value("nodes", json::array())) {
             snapshot.nodes.push_back({value.at("zid").get<std::string>(), value.value("mode", "unknown")});

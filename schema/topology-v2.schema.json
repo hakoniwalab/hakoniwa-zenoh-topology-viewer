@@ -20,7 +20,8 @@
           "endpoint": { "type": "string" },
           "zid": { "type": "string" },
           "status": { "enum": ["ok", "waiting", "error", "stale"] },
-          "error": { "type": "string" }
+          "error": { "type": "string" },
+          "last_received_at": { "type": "integer", "minimum": 0 }
         }
       }
     },

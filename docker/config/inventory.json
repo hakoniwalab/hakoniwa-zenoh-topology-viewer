@@ -1,6 +1,7 @@
 {
   "schema": "hakoniwa.zenoh.inventory/v1",
   "refresh_interval_ms": 1000,
+  "stale_after_ms": 5000,
   "targets": [
     {
       "name": "node-b-router",

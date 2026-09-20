@@ -36,6 +36,14 @@ function renderSnapshot(snapshot) {
   elements.linkCount.textContent = String(topology.links.length);
   elements.schemaName.textContent = `schema: ${topology.schema}`;
   elements.timestamp.textContent = `timestamp: ${topology.timestamp || '-'}`;
+  const staleSources = topology.sources.filter((source) => source.status === 'stale');
+  if (staleSources.length > 0) {
+    setStatus(`partial: stale ${staleSources.map((source) => source.name).join(', ')}`);
+  } else if (topology.status === 'partial') {
+    setStatus('partial');
+  } else {
+    setStatus('connected');
+  }
 }
 
 function setStatus(text) {

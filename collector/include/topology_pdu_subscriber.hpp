@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,6 +26,7 @@ public:
 private:
     std::string endpoint_config_path_;
     std::unique_ptr<hakoniwa::pdu::Endpoint> endpoint_;
+    std::size_t pdu_size_{0};
     bool started_{false};
 };
 

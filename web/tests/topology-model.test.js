@@ -78,3 +78,56 @@ test('v2 aggregated topology uses each observation source as the edge source', (
   assert.equal(edges[1].data.source, 'router-r');
   assert.equal(edges[1].data.target, 'peer-b');
 });
+
+test('v2 stale source marks its node and links as stale', () => {
+  const snapshot = {
+    schema: 'hakoniwa.zenoh.topology/v2',
+    status: 'partial',
+    nodes: [
+      { zid: 'router-r', mode: 'router' },
+      { zid: 'peer-a', mode: 'peer' }
+    ],
+    transports: [],
+    links: [
+      { source_zid: 'peer-a', remote_zid: 'router-r', protocol: 'tcp' }
+    ],
+    sources: [
+      { name: 'node-a', role: 'peer', endpoint: 'node-a.json', zid: 'peer-a', status: 'stale' }
+    ]
+  };
+
+  const topology = normalizeTopology(snapshot);
+  assert.equal(topology.status, 'partial');
+  assert.equal(topology.sources[0].status, 'stale');
+
+  const elements = toCytoscapeElements(snapshot);
+  assert.equal(elements.find((item) => item.group === 'nodes' && item.data.id === 'peer-a').data.stale, true);
+  assert.equal(elements.find((item) => item.group === 'edges').data.stale, true);
+});
+
+test('link remains fresh when at least one observer is fresh', () => {
+  const snapshot = {
+    schema: 'hakoniwa.zenoh.topology/v2',
+    status: 'partial',
+    nodes: [
+      { zid: 'router-r', mode: 'router' },
+      { zid: 'peer-a', mode: 'peer' }
+    ],
+    transports: [],
+    links: [
+      {
+        source_zid: 'peer-a',
+        remote_zid: 'router-r',
+        protocol: 'tcp',
+        observed_by: ['peer-a', 'router-r']
+      }
+    ],
+    sources: [
+      { name: 'node-a', zid: 'peer-a', status: 'stale' },
+      { name: 'router', zid: 'router-r', status: 'ok' }
+    ]
+  };
+
+  const elements = toCytoscapeElements(snapshot);
+  assert.equal(elements.find((item) => item.group === 'edges').data.stale, false);
+});

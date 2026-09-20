@@ -61,6 +61,8 @@ Inventory load_inventory(const std::string& path)
         Inventory result;
         result.refresh_interval_ms = root.value("refresh_interval_ms", std::uint64_t{1000});
         if (result.refresh_interval_ms == 0) throw std::runtime_error("refresh_interval_ms must be positive");
+        result.stale_after_ms = root.value("stale_after_ms", std::uint64_t{5000});
+        if (result.stale_after_ms == 0) throw std::runtime_error("stale_after_ms must be positive");
         const auto base_dir = std::filesystem::absolute(path).parent_path();
         for (const auto& value : root.at("targets")) {
             InventoryTarget target;
@@ -100,7 +102,9 @@ TopologySnapshot aggregate_topology(
             throw std::runtime_error("target " + observation.target.name + " returned unexpected zid " + snapshot.collector_zid);
         }
         result.sources.push_back({observation.target.name, observation.target.role, observation.target.endpoint_config,
-                                  snapshot.collector_zid, "ok", ""});
+                                  snapshot.collector_zid, observation.status, observation.error,
+                                  observation.last_received_at_ms});
+        if (observation.status != "ok") result.status = "partial";
         merge_node(nodes, {snapshot.collector_zid, observation.target.role});
         for (const auto& node : snapshot.nodes) merge_node(nodes, node);
 

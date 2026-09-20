@@ -57,6 +57,20 @@ int main()
     assert(result.links.front().observed_by.size() == 2);
     assert(result.sources.size() == 2);
 
+    observations.front().status = "stale";
+    observations.front().error = "no topology PDU received for 5000 ms";
+    observations.front().last_received_at_ms = 1234;
+    result = aggregate_topology(observations);
+    assert(result.status == "partial");
+    assert(result.links.size() == 1);
+    assert(result.sources.front().status == "stale");
+    assert(result.sources.front().last_received_at_ms == 1234);
+
+    const auto stale_round_trip = topology_from_json(to_json(result));
+    assert(stale_round_trip.sources.size() == 2);
+    assert(stale_round_trip.sources.front().status == "stale");
+    assert(stale_round_trip.sources.front().last_received_at_ms == 1234);
+
     const auto round_trip = topology_from_json(to_json(result));
     assert(round_trip.schema == result.schema);
     assert(round_trip.links.size() == 1);
