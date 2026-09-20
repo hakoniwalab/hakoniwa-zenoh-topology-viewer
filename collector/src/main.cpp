@@ -164,8 +164,12 @@ int main(int argc, char** argv)
                 for (std::size_t i = 0; i < inventory->targets.size(); ++i) {
                     const auto& target = inventory->targets[i];
                     try {
-                        if (const auto json = subscribers[i]->receive_json(); json.has_value()) {
-                            auto snapshot = hako::zenoh_topology::topology_from_json(*json);
+                        std::optional<std::string> latest_json;
+                        while (auto json = subscribers[i]->receive_json()) {
+                            latest_json = std::move(*json);
+                        }
+                        if (latest_json.has_value()) {
+                            auto snapshot = hako::zenoh_topology::topology_from_json(*latest_json);
                             if (!target.expected_zid.empty() && snapshot.collector_zid != target.expected_zid) {
                                 throw std::runtime_error("expected zid " + target.expected_zid
                                     + ", received " + snapshot.collector_zid);
