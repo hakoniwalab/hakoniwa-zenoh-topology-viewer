@@ -89,8 +89,7 @@ export class TopologyView {
             'curve-style': 'bezier',
             'width': 2,
             'line-color': '#98a2b3',
-            'target-arrow-shape': 'triangle',
-            'target-arrow-color': '#98a2b3',
+            'target-arrow-shape': 'none',
             'label': 'data(label)',
             'font-size': 10,
             'text-background-color': '#ffffff',
@@ -103,7 +102,6 @@ export class TopologyView {
           style: {
             'line-style': 'dashed',
             'line-color': '#dc2626',
-            'target-arrow-color': '#dc2626',
             'opacity': 0.6
           }
         },
@@ -112,8 +110,7 @@ export class TopologyView {
           style: {
             'border-width': 4,
             'border-color': '#7c3aed',
-            'line-color': '#7c3aed',
-            'target-arrow-color': '#7c3aed'
+            'line-color': '#7c3aed'
           }
         }
       ]

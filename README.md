@@ -2,6 +2,11 @@
 
 Hakoniwa-based Zenoh topology collector and browser viewer.
 
+ブラウザに表示されるノード、リンク、ラベル、Detailsの読み方は
+[Zenoh Topology Viewerの見方](docs/viewer-guide.md)を参照してください。
+ソース変更後の再ビルドとFoundationへの反映方法は
+[開発・メンテナンスガイド](docs/development.md)を参照してください。
+
 ## Current browser milestone
 
 The first runnable browser milestone does not require Zenoh, but it deliberately
