@@ -9,10 +9,11 @@ components:
   web: true
 
 validation:
-  tests: false
+  tests: true
   smoke: false
 
 # Paths are resolved by the caller / Business Pack workspace.
 paths:
+  zenohc_root: ""
   pdu_endpoint_root: ""
   pdu_javascript_root: ""
