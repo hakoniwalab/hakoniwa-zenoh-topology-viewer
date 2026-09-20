@@ -1,0 +1,5 @@
+{
+  "type": "buffer",
+  "name": "zenoh_topology_latest",
+  "store": { "mode": "latest" }
+}

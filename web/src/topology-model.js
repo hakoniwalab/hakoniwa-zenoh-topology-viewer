@@ -2,7 +2,8 @@ export function normalizeTopology(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') {
     throw new Error('Topology snapshot must be an object');
   }
-  if (snapshot.schema !== 'hakoniwa.zenoh.topology/v1') {
+  if (snapshot.schema !== 'hakoniwa.zenoh.topology/v1'
+      && snapshot.schema !== 'hakoniwa.zenoh.topology/v2') {
     throw new Error(`Unsupported topology schema: ${snapshot.schema ?? '(missing)'}`);
   }
 
@@ -33,9 +34,11 @@ export function normalizeTopology(snapshot) {
   ensureNode(collectorZid, nodeByZid.get(collectorZid)?.mode ?? 'collector');
 
   for (const transport of transports) {
+    ensureNode(transport.source_zid || collectorZid);
     ensureNode(transport.remote_zid, transport.remote_mode);
   }
   for (const link of links) {
+    ensureNode(link.source_zid || collectorZid);
     ensureNode(link.remote_zid);
   }
 
@@ -67,18 +70,19 @@ export function toCytoscapeElements(snapshot) {
   const edgeSource = topology.links.length > 0 ? topology.links : topology.transports;
 
   edgeSource.forEach((item, index) => {
+    const source = item.source_zid || topology.collectorZid;
     const target = item.remote_zid;
-    if (!topology.collectorZid || !target) {
+    if (!source || !target) {
       return;
     }
 
     const protocol = item.protocol || '';
-    const id = `edge-${index}-${topology.collectorZid}-${target}`;
+    const id = `edge-${index}-${source}-${target}`;
     edgeElements.push({
       group: 'edges',
       data: {
         id,
-        source: topology.collectorZid,
+        source,
         target,
         label: protocol,
         kind: topology.links.length > 0 ? 'link' : 'transport',

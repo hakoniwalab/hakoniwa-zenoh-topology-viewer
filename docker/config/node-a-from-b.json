@@ -1,0 +1,6 @@
+{
+  "name": "node-a-from-b",
+  "pdu_def_path": "/workspace/hakoniwa-zenoh-topology-viewer/recipes/zenoh-topology-viewer/config/pdu/pdudef.json",
+  "cache": "/workspace/hakoniwa-zenoh-topology-viewer/docker/config/pdu-cache.json",
+  "comm": "/workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-a-from-b-tcp.json"
+}

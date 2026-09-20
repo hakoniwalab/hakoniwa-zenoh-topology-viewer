@@ -36,20 +36,65 @@ endif()
 
 add_library(hako_zenoh_topology_model
     src/topology_json.cpp
+    src/topology_aggregator.cpp
 )
+set_target_properties(hako_zenoh_topology_model PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(hako_zenoh_topology_model
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+target_link_libraries(hako_zenoh_topology_model
+    PUBLIC
+        nlohmann_json::nlohmann_json
+)
+
 add_executable(hako-zenoh-topology-collector
     src/main.cpp
     src/topology_pdu_publisher.cpp
+    src/topology_pdu_subscriber.cpp
 )
 
 if(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
-    target_sources(hako-zenoh-topology-collector PRIVATE src/zenoh_collector.cpp)
+    add_library(hako_zenoh_topology_connectivity STATIC
+        src/zenoh_collector.cpp
+    )
+    set_target_properties(hako_zenoh_topology_connectivity PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_include_directories(hako_zenoh_topology_connectivity
+        PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_compile_definitions(hako_zenoh_topology_connectivity
+        PRIVATE
+            Z_FEATURE_UNSTABLE_API
+    )
+    if(ZENOHC_BUILD_WITH_SHARED_MEMORY)
+        target_compile_definitions(hako_zenoh_topology_connectivity PRIVATE Z_FEATURE_SHARED_MEMORY)
+    endif()
+    target_link_libraries(hako_zenoh_topology_connectivity
+        PUBLIC
+            hako_zenoh_topology_model
+            zenohc::shared
+    )
+
+    add_library(hako_zenoh_topology_agent SHARED
+        src/topology_agent_c.cpp
+        src/topology_pdu_publisher.cpp
+    )
+    target_include_directories(hako_zenoh_topology_agent
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        PRIVATE
+            ${HAKO_PDU_TYPES_DIR}
+    )
+    target_link_libraries(hako_zenoh_topology_agent
+        PRIVATE
+            hako_zenoh_topology_connectivity
+            hakoniwa_pdu_endpoint::hakoniwa_pdu_endpoint
+            fastcdr
+    )
 endif()
 
 target_include_directories(hako-zenoh-topology-collector
@@ -81,11 +126,22 @@ target_link_libraries(hako-zenoh-topology-collector
 
 if(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
     target_link_libraries(hako-zenoh-topology-collector PRIVATE zenohc::shared)
+    target_link_libraries(hako-zenoh-topology-collector PRIVATE hako_zenoh_topology_connectivity)
 endif()
 
 install(TARGETS hako-zenoh-topology-collector
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+if(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
+    install(TARGETS hako_zenoh_topology_agent
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    install(FILES include/hako_zenoh_topology_agent.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif()
 
 if(HAKO_ZENOH_TOPOLOGY_BUILD_TESTS)
     enable_testing()
@@ -99,4 +155,13 @@ if(HAKO_ZENOH_TOPOLOGY_BUILD_TESTS)
     )
 
     add_test(NAME topology-json COMMAND test-topology-json)
+
+    add_executable(test-topology-aggregator
+        tests/test_topology_aggregator.cpp
+    )
+    target_link_libraries(test-topology-aggregator
+        PRIVATE
+            hako_zenoh_topology_model
+    )
+    add_test(NAME topology-aggregator COMMAND test-topology-aggregator)
 endif()

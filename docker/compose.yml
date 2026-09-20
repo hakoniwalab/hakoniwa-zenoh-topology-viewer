@@ -1,0 +1,118 @@
+services:
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["bash", "/workspace/hakoniwa-zenoh-topology-viewer/docker/build-runtime.bash"]
+    volumes: &sources
+      - ../../zenoh-tutorial/zenoh-c:/workspace/zenoh-c:ro
+      - ../../zenoh-tutorial/sample/c-sample:/workspace/zenoh-tutorial/sample/c-sample:ro
+      - ../../hakoniwa-pdu-endpoint:/workspace/hakoniwa-pdu-endpoint:ro
+      - ../../hakoniwa-pdu-bridge-core:/workspace/hakoniwa-pdu-bridge-core:ro
+      - ../../hakoniwa-pdu-registry:/workspace/hakoniwa-pdu-registry:ro
+      - ..:/workspace/hakoniwa-zenoh-topology-viewer:ro
+      - ../../hakoniwa-pdu-python:/workspace/hakoniwa-pdu-python:ro
+      - ../../hakoniwa-business-pack:/workspace/hakoniwa-business-pack:ro
+      - ../.docker-install:/opt/hakoniwa
+      - ../.docker-build:/build
+      - ../.docker-cargo/registry:/root/.cargo/registry
+      - ../.docker-cargo/git:/root/.cargo/git
+      - ../.docker-web-dist:/web-dist
+
+  web_builder:
+    image: node:22-alpine
+    command:
+      - sh
+      - -c
+      - |
+        cp -R /src/. /tmp/web
+        cd /tmp/web
+        npm install --no-package-lock --no-audit --no-fund
+        npm run build
+        cp -R dist/. /web-dist/
+    volumes:
+      - ../web:/src:ro
+      - ../.docker-web-dist:/web-dist
+
+  node_a:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      builder:
+        condition: service_completed_successfully
+      web_builder:
+        condition: service_completed_successfully
+    command:
+      - bash
+      - -lc
+      - |
+        test -f /opt/hakoniwa/.topology-runtime-ready
+        PYTHONPATH=/workspace/hakoniwa-pdu-python/src exec python3 -m hakoniwa_pdu.apps.launcher.hako_launcher /workspace/hakoniwa-zenoh-topology-viewer/docker/launch-node-a.json --mode activate-only
+    volumes:
+      *sources
+    ports:
+      - "5173:5173"
+      - "8765:8765"
+    networks:
+      topology_net:
+        ipv4_address: 172.31.0.10
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9201 && nc -z 127.0.0.1 9202 && nc -z 127.0.0.1 5173"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+
+  node_b:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      builder:
+        condition: service_completed_successfully
+      node_a:
+        condition: service_healthy
+    environment:
+      HAKO_TOPOLOGY_ENDPOINT_CONFIG: /workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-b-agent-out.json
+      HAKO_TOPOLOGY_INTERVAL_MS: "1000"
+    command:
+      - /opt/hakoniwa/bin/zenoh-tutorial-pub
+      - -c
+      - /workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-b-zenoh.json5
+    volumes: *sources
+    networks:
+      topology_net:
+        ipv4_address: 172.31.0.20
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 7447"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+
+  node_c:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      builder:
+        condition: service_completed_successfully
+      node_b:
+        condition: service_healthy
+    environment:
+      HAKO_TOPOLOGY_ENDPOINT_CONFIG: /workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-c-agent-out.json
+      HAKO_TOPOLOGY_INTERVAL_MS: "1000"
+    command:
+      - /opt/hakoniwa/bin/zenoh-tutorial-sub
+      - -c
+      - /workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-c-zenoh.json5
+    volumes: *sources
+    networks:
+      topology_net:
+        ipv4_address: 172.31.0.30
+
+networks:
+  topology_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24

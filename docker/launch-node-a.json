@@ -1,0 +1,44 @@
+{
+  "version": "0.1",
+  "runtime": { "cleanup_mmap_on_start": false },
+  "defaults": {
+    "delay_sec": 1,
+    "stdout": "/tmp/topology-${asset}.out",
+    "stderr": "/tmp/topology-${asset}.err"
+  },
+  "assets": [
+    {
+      "name": "topology-bridge",
+      "command": "/opt/hakoniwa/bin/hakoniwa-pdu-bridge",
+      "args": [
+        "recipes/zenoh-topology-viewer/config/bridge/bridge.json",
+        "1000",
+        "recipes/zenoh-topology-viewer/config/endpoint/endpoint_container.json",
+        "zenoh_topology_bridge"
+      ],
+      "cwd": "/workspace/hakoniwa-zenoh-topology-viewer",
+      "activation_timing": "before_start"
+    },
+    {
+      "name": "topology-web",
+      "command": "python3",
+      "args": ["-m", "http.server", "5173", "--bind", "0.0.0.0", "--directory", "/web-dist"],
+      "cwd": "/workspace/hakoniwa-zenoh-topology-viewer",
+      "depends_on": ["topology-bridge"],
+      "activation_timing": "before_start"
+    },
+    {
+      "name": "topology-aggregator",
+      "command": "/opt/hakoniwa/bin/hako-zenoh-topology-collector",
+      "args": [
+        "--inventory",
+        "docker/config/inventory.json",
+        "--endpoint-config",
+        "recipes/zenoh-topology-viewer/config/endpoint/collector-out.json"
+      ],
+      "cwd": "/workspace/hakoniwa-zenoh-topology-viewer",
+      "depends_on": ["topology-bridge", "topology-web"],
+      "activation_timing": "before_start"
+    }
+  ]
+}

@@ -60,11 +60,23 @@ void add_or_update_node(TopologySnapshot& snapshot, std::string zid, std::string
     }
 }
 
+struct NodeCallbackContext {
+    TopologySnapshot* snapshot;
+    const char* mode;
+};
+
+void collect_node_id(const z_id_t* zid, void* ctx)
+{
+    auto& context = *static_cast<NodeCallbackContext*>(ctx);
+    add_or_update_node(*context.snapshot, zid_to_string(*zid), context.mode);
+}
+
 void collect_transport(z_loaned_transport_t* transport, void* ctx)
 {
     auto& snapshot = *static_cast<TopologySnapshot*>(ctx);
 
     TransportInfo info;
+    info.source_zid = snapshot.collector_zid;
     info.remote_zid = zid_to_string(z_transport_zid(transport));
     info.remote_mode = whatami_to_string(z_transport_whatami(transport));
     info.qos = z_transport_is_qos(transport);
@@ -82,7 +94,9 @@ void collect_link(z_loaned_link_t* link, void* ctx)
     auto& snapshot = *static_cast<TopologySnapshot*>(ctx);
 
     LinkInfo info;
+    info.source_zid = snapshot.collector_zid;
     info.remote_zid = zid_to_string(z_link_zid(link));
+    info.observed_by.push_back(snapshot.collector_zid);
 
     z_owned_string_t src;
     z_owned_string_t dst;
@@ -145,47 +159,71 @@ std::uint64_t now_ms()
 
 }  // namespace
 
-ZenohCollector::ZenohCollector(std::optional<std::string> config_path)
-    : config_path_(std::move(config_path))
-{
-}
+struct ZenohCollector::Impl {
+    z_owned_session_t session;
+};
 
-TopologySnapshot ZenohCollector::collect_once() const
+ZenohCollector::ZenohCollector(std::optional<std::string> config_path)
+    : impl_(std::make_unique<Impl>())
 {
     z_owned_config_t config;
-    if (config_path_.has_value()) {
-        if (zc_config_from_file(&config, config_path_->c_str()) < 0) {
-            throw std::runtime_error("failed to load Zenoh config: " + *config_path_);
+    if (config_path.has_value()) {
+        if (zc_config_from_file(&config, config_path->c_str()) < 0) {
+            throw std::runtime_error("failed to load Zenoh config: " + *config_path);
         }
     } else {
         z_config_default(&config);
     }
 
-    z_owned_session_t session;
-    if (z_open(&session, z_move(config), nullptr) < 0) {
+    if (z_open(&impl_->session, z_move(config), nullptr) < 0) {
         throw std::runtime_error("failed to open Zenoh session");
     }
+}
+
+ZenohCollector::~ZenohCollector()
+{
+    if (impl_) z_drop(z_move(impl_->session));
+}
+
+TopologySnapshot ZenohCollector::collect_once() const
+{
+    return collect_session_topology(z_loan(impl_->session));
+}
+
+TopologySnapshot collect_session_topology(const z_loaned_session_t* session)
+{
 
     TopologySnapshot snapshot;
     snapshot.timestamp_ms = now_ms();
-    snapshot.collector_zid = zid_to_string(z_info_zid(z_loan(session)));
+    snapshot.collector_zid = zid_to_string(z_info_zid(session));
     add_or_update_node(snapshot, snapshot.collector_zid, "unknown");
+
+    NodeCallbackContext router_context{&snapshot, "router"};
+    z_owned_closure_zid_t router_callback;
+    z_closure(&router_callback, collect_node_id, nullptr, &router_context);
+    if (z_info_routers_zid(session, z_move(router_callback)) < 0) {
+        throw std::runtime_error("failed to query connected Zenoh routers");
+    }
+
+    NodeCallbackContext peer_context{&snapshot, "peer"};
+    z_owned_closure_zid_t peer_callback;
+    z_closure(&peer_callback, collect_node_id, nullptr, &peer_context);
+    if (z_info_peers_zid(session, z_move(peer_callback)) < 0) {
+        throw std::runtime_error("failed to query connected Zenoh peers");
+    }
 
     z_owned_closure_transport_t transport_callback;
     z_closure(&transport_callback, collect_transport, nullptr, &snapshot);
-    if (z_info_transports(z_loan(session), z_move(transport_callback)) < 0) {
-        z_drop(z_move(session));
+    if (z_info_transports(session, z_move(transport_callback)) < 0) {
         throw std::runtime_error("failed to query Zenoh transports");
     }
 
     z_owned_closure_link_t link_callback;
     z_closure(&link_callback, collect_link, nullptr, &snapshot);
-    if (z_info_links(z_loan(session), z_move(link_callback), nullptr) < 0) {
-        z_drop(z_move(session));
+    if (z_info_links(session, z_move(link_callback), nullptr) < 0) {
         throw std::runtime_error("failed to query Zenoh links");
     }
 
-    z_drop(z_move(session));
     return snapshot;
 }
 

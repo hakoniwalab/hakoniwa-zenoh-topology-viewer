@@ -1,0 +1,9 @@
+{
+  id: "c",
+  mode: "peer",
+  connect: { endpoints: ["tcp/node_b:7447"], exit_on_failure: true },
+  scouting: {
+    multicast: { enabled: false },
+    gossip: { enabled: false }
+  }
+}

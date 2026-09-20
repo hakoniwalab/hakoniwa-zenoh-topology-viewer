@@ -1,0 +1,8 @@
+{
+  "protocol": "tcp",
+  "name": "node_c_topology_client",
+  "direction": "out",
+  "role": "client",
+  "comm_raw_version": "v2",
+  "remote": { "address": "node_a", "port": 9202 }
+}

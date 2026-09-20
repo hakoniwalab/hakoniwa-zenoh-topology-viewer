@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hakoniwa.zenoh.inventory/v1",
+  "type": "object",
+  "required": ["schema", "targets"],
+  "properties": {
+    "schema": { "const": "hakoniwa.zenoh.inventory/v1" },
+    "refresh_interval_ms": { "type": "integer", "minimum": 1 },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "role", "endpoint_config"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "role": { "enum": ["router", "peer"] },
+          "endpoint_config": { "type": "string", "minLength": 1 },
+          "expected_zid": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

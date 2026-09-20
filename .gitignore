@@ -2,6 +2,10 @@
 build/
 collector/build/
 web/node_modules/
+.docker-build/
+.docker-cargo/
+.docker-install/
+.docker-web-dist/
 
 # Component-local resolved state
 .hako/

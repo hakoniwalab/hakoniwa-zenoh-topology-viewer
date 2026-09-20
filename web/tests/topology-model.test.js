@@ -53,3 +53,28 @@ test('unsupported schema is rejected', () => {
     /Unsupported topology schema/
   );
 });
+
+test('v2 aggregated topology uses each observation source as the edge source', () => {
+  const snapshot = {
+    schema: 'hakoniwa.zenoh.topology/v2',
+    timestamp: 1,
+    collector: { zid: '' },
+    nodes: [
+      { zid: 'router-r', mode: 'router' },
+      { zid: 'peer-a', mode: 'peer' },
+      { zid: 'peer-b', mode: 'peer' }
+    ],
+    transports: [],
+    links: [
+      { source_zid: 'router-r', remote_zid: 'peer-a', protocol: 'tcp' },
+      { source_zid: 'router-r', remote_zid: 'peer-b', protocol: 'tcp' }
+    ]
+  };
+
+  const edges = toCytoscapeElements(snapshot).filter((element) => element.group === 'edges');
+  assert.equal(edges.length, 2);
+  assert.equal(edges[0].data.source, 'router-r');
+  assert.equal(edges[0].data.target, 'peer-a');
+  assert.equal(edges[1].data.source, 'router-r');
+  assert.equal(edges[1].data.target, 'peer-b');
+});

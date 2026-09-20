@@ -13,6 +13,7 @@ struct NodeInfo {
 };
 
 struct TransportInfo {
+    std::string source_zid;
     std::string remote_zid;
     std::string remote_mode{"unknown"};
     bool qos{false};
@@ -21,6 +22,7 @@ struct TransportInfo {
 };
 
 struct LinkInfo {
+    std::string source_zid;
     std::string remote_zid;
     std::string protocol;
     std::string src_endpoint;
@@ -33,6 +35,16 @@ struct LinkInfo {
     std::optional<std::uint8_t> min_priority;
     std::optional<std::uint8_t> max_priority;
     std::optional<std::string> reliability;
+    std::vector<std::string> observed_by;
+};
+
+struct ObservationSource {
+    std::string name;
+    std::string role;
+    std::string endpoint;
+    std::string zid;
+    std::string status{"ok"};
+    std::string error;
 };
 
 struct TopologySnapshot {
@@ -42,6 +54,8 @@ struct TopologySnapshot {
     std::vector<NodeInfo> nodes;
     std::vector<TransportInfo> transports;
     std::vector<LinkInfo> links;
+    std::string status{"complete"};
+    std::vector<ObservationSource> sources;
 };
 
 }  // namespace hako::zenoh_topology

@@ -3,6 +3,7 @@
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -10,7 +11,9 @@
 #include <thread>
 
 #include "topology_json.hpp"
+#include "topology_aggregator.hpp"
 #include "topology_pdu_publisher.hpp"
+#include "topology_pdu_subscriber.hpp"
 #if defined(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
 #include "zenoh.h"
 #include "zenoh_collector.hpp"
@@ -22,6 +25,7 @@ struct Options {
     std::optional<std::string> config_path;
     std::optional<std::string> input_file_path;
     std::optional<std::string> endpoint_config_path;
+    std::optional<std::string> inventory_path;
     std::uint64_t publish_interval_ms{0};
     bool print_stdout{true};
 };
@@ -64,6 +68,11 @@ Options parse_args(int argc, char** argv)
                 throw std::runtime_error("--endpoint-config requires a path");
             }
             options.endpoint_config_path = argv[++i];
+        } else if (arg == "--inventory") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("--inventory requires a path");
+            }
+            options.inventory_path = argv[++i];
         } else if (arg == "--publish-interval-ms") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("--publish-interval-ms requires a value");
@@ -88,18 +97,18 @@ Options parse_args(int argc, char** argv)
                 << "  -c, --config <zenoh.json5>       Zenoh session config\n"
                 << "      --input-file <topology.json> Read a topology snapshot instead of Zenoh\n"
                 << "      --endpoint-config <json>     Hakoniwa Endpoint config; publishes CDR std_msgs/String\n"
-                << "      --publish-interval-ms <ms>   Re-read and publish the input file periodically\n"
+                << "      --inventory <json>           Aggregate topology agents defined in an inventory\n"
+                << "      --publish-interval-ms <ms>   Refresh file/inventory and publish periodically\n"
                 << "      --no-stdout                  Do not print the JSON snapshot\n";
             std::exit(0);
         } else {
             throw std::runtime_error("unknown argument: " + arg);
         }
     }
-    if (options.config_path.has_value() && options.input_file_path.has_value()) {
-        throw std::runtime_error("--config and --input-file are mutually exclusive");
-    }
-    if (options.publish_interval_ms > 0 && !options.input_file_path.has_value()) {
-        throw std::runtime_error("--publish-interval-ms requires --input-file");
+    const auto source_count = static_cast<int>(options.input_file_path.has_value())
+        + static_cast<int>(options.inventory_path.has_value());
+    if (source_count > 1 || (options.config_path.has_value() && source_count > 0)) {
+        throw std::runtime_error("--config, --input-file and --inventory select mutually exclusive sources");
     }
     return options;
 }
@@ -110,14 +119,62 @@ int main(int argc, char** argv)
 {
     try {
         const auto options = parse_args(argc, argv);
-        const auto collect_json = [&options]() {
+        std::optional<hako::zenoh_topology::Inventory> inventory;
+        if (options.inventory_path.has_value()) {
+            inventory = hako::zenoh_topology::load_inventory(*options.inventory_path);
+        }
+        std::vector<std::unique_ptr<hako::zenoh_topology::TopologyPduSubscriber>> subscribers;
+        std::vector<std::optional<hako::zenoh_topology::TopologySnapshot>> latest_observations;
+        if (inventory.has_value()) {
+            subscribers.reserve(inventory->targets.size());
+            latest_observations.resize(inventory->targets.size());
+            for (const auto& target : inventory->targets) {
+                auto subscriber = std::make_unique<hako::zenoh_topology::TopologyPduSubscriber>(
+                    target.endpoint_config);
+                subscriber->start();
+                subscribers.push_back(std::move(subscriber));
+            }
+        }
+#if defined(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
+        std::unique_ptr<hako::zenoh_topology::ZenohCollector> zenoh_collector;
+        if (!options.input_file_path.has_value() && !options.inventory_path.has_value()) {
+            zc_init_log_from_env_or("error");
+            zenoh_collector = std::make_unique<hako::zenoh_topology::ZenohCollector>(options.config_path);
+        }
+#endif
+        const auto collect_json = [&]() {
             if (options.input_file_path.has_value()) {
                 return read_text_file(*options.input_file_path);
             }
+            if (inventory.has_value()) {
+                std::vector<hako::zenoh_topology::TargetObservation> observations;
+                std::vector<hako::zenoh_topology::ObservationSource> failures;
+                for (std::size_t i = 0; i < inventory->targets.size(); ++i) {
+                    const auto& target = inventory->targets[i];
+                    try {
+                        if (const auto json = subscribers[i]->receive_json(); json.has_value()) {
+                            auto snapshot = hako::zenoh_topology::topology_from_json(*json);
+                            if (!target.expected_zid.empty() && snapshot.collector_zid != target.expected_zid) {
+                                throw std::runtime_error("expected zid " + target.expected_zid
+                                    + ", received " + snapshot.collector_zid);
+                            }
+                            latest_observations[i] = std::move(snapshot);
+                        }
+                        if (latest_observations[i].has_value()) {
+                            observations.push_back({target, *latest_observations[i]});
+                        } else {
+                            failures.push_back({target.name, target.role, target.endpoint_config,
+                                                "", "waiting", "no topology PDU received yet"});
+                        }
+                    } catch (const std::exception& e) {
+                        failures.push_back({target.name, target.role, target.endpoint_config, "", "error", e.what()});
+                    }
+                }
+                return hako::zenoh_topology::to_json(
+                    hako::zenoh_topology::aggregate_topology(observations, failures));
+            }
 #if defined(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
-            zc_init_log_from_env_or("error");
-            const hako::zenoh_topology::ZenohCollector collector(options.config_path);
-            return hako::zenoh_topology::to_json(collector.collect_once());
+            return hako::zenoh_topology::to_json(zenoh_collector->collect_once());
 #else
             throw std::runtime_error(
                 "this collector was built without Zenoh; --input-file is required");
@@ -133,11 +190,14 @@ int main(int argc, char** argv)
                     std::cout << json << std::endl;
                 }
                 publisher.publish_json(json);
-                if (options.publish_interval_ms > 0) {
+                const auto interval = options.publish_interval_ms > 0
+                    ? options.publish_interval_ms
+                    : (inventory.has_value() ? inventory->refresh_interval_ms : 0);
+                if (interval > 0) {
                     std::this_thread::sleep_for(
-                        std::chrono::milliseconds(options.publish_interval_ms));
+                        std::chrono::milliseconds(interval));
                 }
-            } while (options.publish_interval_ms > 0);
+            } while (options.publish_interval_ms > 0 || inventory.has_value());
         } else {
             const auto json = collect_json();
             if (options.print_stdout) {

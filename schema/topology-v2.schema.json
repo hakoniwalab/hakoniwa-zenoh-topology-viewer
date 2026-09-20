@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hakoniwa.zenoh.topology/v2",
+  "title": "Aggregated Hakoniwa Zenoh Topology Snapshot v2",
+  "type": "object",
+  "required": ["schema", "timestamp", "status", "nodes", "transports", "links", "sources"],
+  "properties": {
+    "schema": { "const": "hakoniwa.zenoh.topology/v2" },
+    "timestamp": { "type": "integer", "minimum": 0 },
+    "status": { "enum": ["complete", "partial"] },
+    "collector": { "type": "object" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "role", "endpoint", "status"],
+        "properties": {
+          "name": { "type": "string" },
+          "role": { "enum": ["router", "peer"] },
+          "endpoint": { "type": "string" },
+          "zid": { "type": "string" },
+          "status": { "enum": ["ok", "waiting", "error", "stale"] },
+          "error": { "type": "string" }
+        }
+      }
+    },
+    "nodes": { "type": "array", "items": { "type": "object" } },
+    "transports": { "type": "array", "items": { "type": "object" } },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_zid", "remote_zid"],
+        "properties": {
+          "source_zid": { "type": "string" },
+          "remote_zid": { "type": "string" },
+          "observed_by": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}
