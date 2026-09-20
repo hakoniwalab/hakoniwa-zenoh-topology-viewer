@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hakoniwa.zenoh.topology/v1",
+  "title": "Hakoniwa Zenoh Topology Snapshot v1",
+  "type": "object",
+  "required": ["schema", "nodes", "transports", "links"],
+  "properties": {
+    "schema": {
+      "const": "hakoniwa.zenoh.topology/v1"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "collector": {
+      "type": "object"
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "transports": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "links": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,18 @@
+version: 1
+
+build:
+  type: Release
+  dir: collector/build
+
+components:
+  collector: true
+  web: true
+
+validation:
+  tests: false
+  smoke: false
+
+# Paths are resolved by the caller / Business Pack workspace.
+paths:
+  pdu_endpoint_root: ""
+  pdu_javascript_root: ""
