@@ -1,6 +1,6 @@
 {
-  "name": "node-a-from-b",
+  "name": "node-a-agent-mux",
   "pdu_def_path": "/workspace/hakoniwa-zenoh-topology-viewer/recipes/zenoh-topology-viewer/config/pdu/pdudef.json",
   "cache": "/workspace/hakoniwa-zenoh-topology-viewer/docker/config/pdu-input-queue.json",
-  "comm": "/workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-a-from-b-tcp.json"
+  "comm": "/workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-a-agent-mux-tcp.json"
 }

@@ -7,12 +7,13 @@
     "schema": { "const": "hakoniwa.zenoh.inventory/v1" },
     "refresh_interval_ms": { "type": "integer", "minimum": 1 },
     "stale_after_ms": { "type": "integer", "minimum": 1, "default": 5000 },
+    "endpoint_mux_config": { "type": "string", "minLength": 1 },
     "targets": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["name", "role", "endpoint_config"],
+        "required": ["name", "role"],
         "properties": {
           "name": { "type": "string", "minLength": 1 },
           "role": { "enum": ["router", "peer"] },

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <exception>
@@ -132,19 +133,26 @@ int main(int argc, char** argv)
             inventory = hako::zenoh_topology::load_inventory(*options.inventory_path);
         }
         std::vector<std::unique_ptr<hako::zenoh_topology::TopologyPduSubscriber>> subscribers;
+        std::unique_ptr<hako::zenoh_topology::TopologyPduMultiplexer> multiplexer;
         std::vector<std::optional<hako::zenoh_topology::TopologySnapshot>> latest_observations;
         std::vector<std::optional<std::chrono::steady_clock::time_point>> last_received_times;
         std::vector<std::optional<std::uint64_t>> last_received_at_ms;
         if (inventory.has_value()) {
-            subscribers.reserve(inventory->targets.size());
             latest_observations.resize(inventory->targets.size());
             last_received_times.resize(inventory->targets.size());
             last_received_at_ms.resize(inventory->targets.size());
-            for (const auto& target : inventory->targets) {
-                auto subscriber = std::make_unique<hako::zenoh_topology::TopologyPduSubscriber>(
-                    target.endpoint_config);
-                subscriber->start();
-                subscribers.push_back(std::move(subscriber));
+            if (!inventory->endpoint_mux_config.empty()) {
+                multiplexer = std::make_unique<hako::zenoh_topology::TopologyPduMultiplexer>(
+                    inventory->endpoint_mux_config);
+                multiplexer->start();
+            } else {
+                subscribers.reserve(inventory->targets.size());
+                for (const auto& target : inventory->targets) {
+                    auto subscriber = std::make_unique<hako::zenoh_topology::TopologyPduSubscriber>(
+                        target.endpoint_config);
+                    subscriber->start();
+                    subscribers.push_back(std::move(subscriber));
+                }
             }
         }
 #if defined(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
@@ -161,44 +169,93 @@ int main(int argc, char** argv)
             if (inventory.has_value()) {
                 std::vector<hako::zenoh_topology::TargetObservation> observations;
                 std::vector<hako::zenoh_topology::ObservationSource> failures;
+                std::vector<std::optional<std::string>> target_errors(inventory->targets.size());
+
+                if (multiplexer) {
+                    auto accepted = multiplexer->take_subscribers();
+                    for (auto& subscriber : accepted) subscribers.push_back(std::move(subscriber));
+
+                    for (auto it = subscribers.begin(); it != subscribers.end();) {
+                        try {
+                            std::optional<std::string> latest_json;
+                            while (auto json = (*it)->receive_json()) latest_json = std::move(*json);
+                            if (latest_json.has_value()) {
+                                auto snapshot = hako::zenoh_topology::topology_from_json(*latest_json);
+                                const auto target_it = std::find_if(
+                                    inventory->targets.begin(), inventory->targets.end(),
+                                    [&](const auto& target) {
+                                        return target.expected_zid == snapshot.collector_zid;
+                                    });
+                                if (target_it == inventory->targets.end()) {
+                                    throw std::runtime_error(
+                                        "received topology from unknown zid " + snapshot.collector_zid);
+                                }
+                                const auto index = static_cast<std::size_t>(
+                                    std::distance(inventory->targets.begin(), target_it));
+                                if (!latest_observations[index].has_value()
+                                    || snapshot.timestamp_ms >= latest_observations[index]->timestamp_ms) {
+                                    latest_observations[index] = std::move(snapshot);
+                                    last_received_times[index] = std::chrono::steady_clock::now();
+                                    last_received_at_ms[index] = system_now_ms();
+                                }
+                            }
+                        } catch (const std::exception& e) {
+                            failures.push_back({"multiplexer-session", "", inventory->endpoint_mux_config,
+                                                "", "error", e.what()});
+                        }
+                        if (!(*it)->is_running()) {
+                            it = subscribers.erase(it);
+                        } else {
+                            ++it;
+                        }
+                    }
+                } else {
+                    for (std::size_t i = 0; i < inventory->targets.size(); ++i) {
+                        const auto& target = inventory->targets[i];
+                        try {
+                            std::optional<std::string> latest_json;
+                            while (auto json = subscribers[i]->receive_json()) {
+                                latest_json = std::move(*json);
+                            }
+                            if (latest_json.has_value()) {
+                                auto snapshot = hako::zenoh_topology::topology_from_json(*latest_json);
+                                if (!target.expected_zid.empty() && snapshot.collector_zid != target.expected_zid) {
+                                    throw std::runtime_error("expected zid " + target.expected_zid
+                                        + ", received " + snapshot.collector_zid);
+                                }
+                                latest_observations[i] = std::move(snapshot);
+                                last_received_times[i] = std::chrono::steady_clock::now();
+                                last_received_at_ms[i] = system_now_ms();
+                            }
+                        } catch (const std::exception& e) {
+                            target_errors[i] = e.what();
+                        }
+                    }
+                }
+
                 for (std::size_t i = 0; i < inventory->targets.size(); ++i) {
                     const auto& target = inventory->targets[i];
-                    try {
-                        std::optional<std::string> latest_json;
-                        while (auto json = subscribers[i]->receive_json()) {
-                            latest_json = std::move(*json);
-                        }
-                        if (latest_json.has_value()) {
-                            auto snapshot = hako::zenoh_topology::topology_from_json(*latest_json);
-                            if (!target.expected_zid.empty() && snapshot.collector_zid != target.expected_zid) {
-                                throw std::runtime_error("expected zid " + target.expected_zid
-                                    + ", received " + snapshot.collector_zid);
-                            }
-                            latest_observations[i] = std::move(snapshot);
-                            last_received_times[i] = std::chrono::steady_clock::now();
-                            last_received_at_ms[i] = system_now_ms();
-                        }
-                        if (latest_observations[i].has_value()) {
-                            const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                std::chrono::steady_clock::now() - *last_received_times[i]).count();
-                            if (elapsed_ms >= static_cast<std::int64_t>(inventory->stale_after_ms)) {
-                                observations.push_back({
-                                    target,
-                                    *latest_observations[i],
-                                    "stale",
-                                    "no topology PDU received for " + std::to_string(elapsed_ms) + " ms",
-                                    last_received_at_ms[i],
-                                });
-                            } else {
-                                observations.push_back({
-                                    target, *latest_observations[i], "ok", "", last_received_at_ms[i]});
-                            }
+                    if (target_errors[i].has_value()) {
+                        failures.push_back({target.name, target.role, target.endpoint_config,
+                                            "", "error", *target_errors[i]});
+                    } else if (latest_observations[i].has_value()) {
+                        const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - *last_received_times[i]).count();
+                        if (elapsed_ms >= static_cast<std::int64_t>(inventory->stale_after_ms)) {
+                            observations.push_back({
+                                target,
+                                *latest_observations[i],
+                                "stale",
+                                "no topology PDU received for " + std::to_string(elapsed_ms) + " ms",
+                                last_received_at_ms[i],
+                            });
                         } else {
-                            failures.push_back({target.name, target.role, target.endpoint_config,
-                                                "", "waiting", "no topology PDU received yet"});
+                            observations.push_back({
+                                target, *latest_observations[i], "ok", "", last_received_at_ms[i]});
                         }
-                    } catch (const std::exception& e) {
-                        failures.push_back({target.name, target.role, target.endpoint_config, "", "error", e.what()});
+                    } else {
+                        failures.push_back({target.name, target.role, target.endpoint_config,
+                                            "", "waiting", "no topology PDU received yet"});
                     }
                 }
                 return hako::zenoh_topology::to_json(

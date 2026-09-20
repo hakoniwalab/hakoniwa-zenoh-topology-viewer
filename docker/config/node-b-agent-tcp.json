@@ -4,5 +4,5 @@
   "direction": "out",
   "role": "client",
   "comm_raw_version": "v2",
-  "remote": { "address": "node_a", "port": 9201 }
+  "remote": { "address": "node_a", "port": 9200 }
 }

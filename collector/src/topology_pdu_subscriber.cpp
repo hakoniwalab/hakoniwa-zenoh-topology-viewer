@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "hakoniwa/pdu/endpoint.hpp"
+#include "hakoniwa/pdu/endpoint_comm_multiplexer.hpp"
 #include "std_msgs/pdu_cpptype_cdr_conv_String.hpp"
 
 namespace hako::zenoh_topology {
@@ -17,6 +18,22 @@ TopologyPduSubscriber::TopologyPduSubscriber(std::string endpoint_config_path)
       endpoint_(std::make_unique<hakoniwa::pdu::Endpoint>(
           "zenoh_topology_aggregator_input", HAKO_PDU_ENDPOINT_DIRECTION_IN))
 {
+}
+
+TopologyPduSubscriber::TopologyPduSubscriber(
+    std::unique_ptr<hakoniwa::pdu::Endpoint> endpoint,
+    std::string endpoint_config_path)
+    : endpoint_config_path_(std::move(endpoint_config_path)),
+      endpoint_(std::move(endpoint)),
+      started_(true)
+{
+    if (!endpoint_) throw std::runtime_error("multiplexer returned an empty endpoint");
+    const hakoniwa::pdu::PduKey key{"ZenohTopology", "topology"};
+    pdu_size_ = endpoint_->get_pdu_size(key);
+    if (pdu_size_ == 0) {
+        stop();
+        throw std::runtime_error("topology PDU definition was not found: " + endpoint_config_path_);
+    }
 }
 
 TopologyPduSubscriber::~TopologyPduSubscriber()
@@ -65,6 +82,13 @@ std::optional<std::string> TopologyPduSubscriber::receive_json()
     return value.data;
 }
 
+bool TopologyPduSubscriber::is_running() noexcept
+{
+    if (!started_) return false;
+    bool running = false;
+    return endpoint_->is_running(running) == HAKO_PDU_ERR_OK && running;
+}
+
 void TopologyPduSubscriber::stop() noexcept
 {
     if (!endpoint_) return;
@@ -73,6 +97,52 @@ void TopologyPduSubscriber::stop() noexcept
         started_ = false;
     }
     (void)endpoint_->close();
+}
+
+TopologyPduMultiplexer::TopologyPduMultiplexer(std::string endpoint_config_path)
+    : endpoint_config_path_(std::move(endpoint_config_path)),
+      multiplexer_(std::make_unique<hakoniwa::pdu::EndpointCommMultiplexer>(
+          "zenoh_topology_aggregator_mux", HAKO_PDU_ENDPOINT_DIRECTION_IN))
+{
+}
+
+TopologyPduMultiplexer::~TopologyPduMultiplexer()
+{
+    stop();
+}
+
+void TopologyPduMultiplexer::start()
+{
+    if (started_) return;
+    if (multiplexer_->open(endpoint_config_path_) != HAKO_PDU_ERR_OK) {
+        throw std::runtime_error("failed to open aggregator input multiplexer: " + endpoint_config_path_);
+    }
+    if (multiplexer_->start() != HAKO_PDU_ERR_OK) {
+        (void)multiplexer_->close();
+        throw std::runtime_error("failed to start aggregator input multiplexer: " + endpoint_config_path_);
+    }
+    started_ = true;
+}
+
+std::vector<std::unique_ptr<TopologyPduSubscriber>> TopologyPduMultiplexer::take_subscribers()
+{
+    if (!started_) throw std::runtime_error("aggregator input multiplexer is not started");
+    std::vector<std::unique_ptr<TopologyPduSubscriber>> subscribers;
+    for (auto& endpoint : multiplexer_->take_endpoints()) {
+        subscribers.push_back(std::make_unique<TopologyPduSubscriber>(
+            std::move(endpoint), endpoint_config_path_));
+    }
+    return subscribers;
+}
+
+void TopologyPduMultiplexer::stop() noexcept
+{
+    if (!multiplexer_) return;
+    if (started_) {
+        (void)multiplexer_->stop();
+        started_ = false;
+    }
+    (void)multiplexer_->close();
 }
 
 }  // namespace hako::zenoh_topology

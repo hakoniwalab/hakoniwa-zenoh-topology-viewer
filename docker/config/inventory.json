@@ -2,17 +2,16 @@
   "schema": "hakoniwa.zenoh.inventory/v1",
   "refresh_interval_ms": 1000,
   "stale_after_ms": 5000,
+  "endpoint_mux_config": "node-a-agent-mux.json",
   "targets": [
     {
       "name": "node-b-router",
       "role": "router",
-      "endpoint_config": "node-a-from-b.json",
       "expected_zid": "b"
     },
     {
       "name": "node-c-peer",
       "role": "peer",
-      "endpoint_config": "node-a-from-c.json",
       "expected_zid": "c"
     }
   ]

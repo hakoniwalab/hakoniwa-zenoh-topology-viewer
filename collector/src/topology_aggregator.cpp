@@ -64,15 +64,27 @@ Inventory load_inventory(const std::string& path)
         result.stale_after_ms = root.value("stale_after_ms", std::uint64_t{5000});
         if (result.stale_after_ms == 0) throw std::runtime_error("stale_after_ms must be positive");
         const auto base_dir = std::filesystem::absolute(path).parent_path();
+        if (root.contains("endpoint_mux_config")) {
+            auto mux_config = std::filesystem::path(root.at("endpoint_mux_config").get<std::string>());
+            if (mux_config.is_relative()) mux_config = base_dir / mux_config;
+            result.endpoint_mux_config = mux_config.lexically_normal().string();
+        }
         for (const auto& value : root.at("targets")) {
             InventoryTarget target;
             target.name = value.at("name").get<std::string>();
             target.role = value.at("role").get<std::string>();
-            auto endpoint_config = std::filesystem::path(value.at("endpoint_config").get<std::string>());
-            if (endpoint_config.is_relative()) endpoint_config = base_dir / endpoint_config;
-            target.endpoint_config = endpoint_config.lexically_normal().string();
+            if (value.contains("endpoint_config")) {
+                auto endpoint_config = std::filesystem::path(value.at("endpoint_config").get<std::string>());
+                if (endpoint_config.is_relative()) endpoint_config = base_dir / endpoint_config;
+                target.endpoint_config = endpoint_config.lexically_normal().string();
+            } else {
+                target.endpoint_config = result.endpoint_mux_config;
+            }
             target.expected_zid = value.value("expected_zid", "");
             if (target.name.empty() || target.endpoint_config.empty()) throw std::runtime_error("inventory target name/endpoint_config must not be empty");
+            if (!result.endpoint_mux_config.empty() && target.expected_zid.empty()) {
+                throw std::runtime_error("multiplexed inventory targets require expected_zid");
+            }
             result.targets.push_back(std::move(target));
         }
         if (result.targets.empty()) throw std::runtime_error("inventory must contain at least one target");

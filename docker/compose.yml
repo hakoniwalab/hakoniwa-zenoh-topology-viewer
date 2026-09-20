@@ -68,8 +68,7 @@ services:
       test:
         - CMD-SHELL
         - >-
-          grep -q '00000000:23F1 .* 0A ' /proc/net/tcp &&
-          grep -q '00000000:23F2 .* 0A ' /proc/net/tcp &&
+          grep -q '00000000:23F0 .* 0A ' /proc/net/tcp &&
           curl -fsS http://127.0.0.1:5173/ >/dev/null
       interval: 2s
       timeout: 1s
