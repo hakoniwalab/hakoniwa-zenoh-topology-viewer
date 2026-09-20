@@ -84,8 +84,9 @@ export function toCytoscapeElements(snapshot) {
 
   const edgeElements = [];
   const edgeSource = topology.links.length > 0 ? topology.links : topology.transports;
+  const edgeIdOccurrences = new Map();
 
-  edgeSource.forEach((item, index) => {
+  edgeSource.forEach((item) => {
     const source = item.source_zid || topology.collectorZid;
     const target = item.remote_zid;
     if (!source || !target) {
@@ -93,7 +94,18 @@ export function toCytoscapeElements(snapshot) {
     }
 
     const protocol = item.protocol || '';
-    const id = `edge-${index}-${source}-${target}`;
+    const kind = topology.links.length > 0 ? 'link' : 'transport';
+    const edgeKey = [
+      kind,
+      source,
+      target,
+      protocol,
+      item.src_endpoint || '',
+      item.dst_endpoint || ''
+    ].map((value) => encodeURIComponent(value)).join(':');
+    const occurrence = (edgeIdOccurrences.get(edgeKey) || 0) + 1;
+    edgeIdOccurrences.set(edgeKey, occurrence);
+    const id = `edge:${edgeKey}:${occurrence}`;
     edgeElements.push({
       group: 'edges',
       data: {
@@ -101,7 +113,7 @@ export function toCytoscapeElements(snapshot) {
         source,
         target,
         label: protocol,
-        kind: topology.links.length > 0 ? 'link' : 'transport',
+        kind,
         stale: topology.isStale(item, source),
         raw: item
       }

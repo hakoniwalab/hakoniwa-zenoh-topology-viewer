@@ -1,6 +1,38 @@
 import cytoscape from 'cytoscape';
 import { normalizeTopology, toCytoscapeElements } from './topology-model.js';
 
+export function syncCytoscapeElements(cy, nextElements) {
+  const nextById = new Map(nextElements.map((element) => [element.data.id, element]));
+  let structureChanged = false;
+
+  cy.batch(() => {
+    cy.elements().forEach((element) => {
+      if (!nextById.has(element.id())) {
+        element.remove();
+        structureChanged = true;
+      }
+    });
+
+    nextElements.forEach((next) => {
+      const existing = cy.getElementById(next.data.id);
+      const sameGroup = existing.length > 0
+        && ((next.group === 'nodes' && existing.isNode())
+          || (next.group === 'edges' && existing.isEdge()));
+      if (sameGroup) {
+        existing.data(next.data);
+        return;
+      }
+      if (existing.length > 0) {
+        existing.remove();
+      }
+      cy.add(next);
+      structureChanged = true;
+    });
+  });
+
+  return structureChanged;
+}
+
 export class TopologyView {
   constructor(container, detailsElement) {
     this.detailsElement = detailsElement;
@@ -93,14 +125,16 @@ export class TopologyView {
 
   render(snapshot) {
     const topology = normalizeTopology(snapshot);
-    this.cy.elements().remove();
-    this.cy.add(toCytoscapeElements(snapshot));
-    this.cy.layout({
-      name: 'cose',
-      animate: false,
-      fit: true,
-      padding: 40
-    }).run();
+    const structureChanged = syncCytoscapeElements(this.cy, toCytoscapeElements(snapshot));
+    if (structureChanged) {
+      this.cy.layout({
+        name: 'cose',
+        animate: false,
+        fit: true,
+        padding: 40,
+        randomize: false
+      }).run();
+    }
     this.showDetails({
       schema: topology.schema,
       collector_zid: topology.collectorZid,

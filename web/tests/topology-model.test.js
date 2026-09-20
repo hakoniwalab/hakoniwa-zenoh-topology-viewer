@@ -131,3 +131,27 @@ test('link remains fresh when at least one observer is fresh', () => {
   const elements = toCytoscapeElements(snapshot);
   assert.equal(elements.find((item) => item.group === 'edges').data.stale, false);
 });
+
+test('link IDs stay stable when snapshot order changes', () => {
+  const first = {
+    schema: 'hakoniwa.zenoh.topology/v2',
+    nodes: [
+      { zid: 'peer-a', mode: 'peer' },
+      { zid: 'peer-b', mode: 'peer' },
+      { zid: 'router-r', mode: 'router' }
+    ],
+    transports: [],
+    links: [
+      { source_zid: 'peer-a', remote_zid: 'router-r', protocol: 'tcp', src_endpoint: 'a:1' },
+      { source_zid: 'peer-b', remote_zid: 'router-r', protocol: 'tcp', src_endpoint: 'b:1' }
+    ]
+  };
+  const second = { ...first, links: [...first.links].reverse() };
+
+  const edgeIds = (value) => toCytoscapeElements(value)
+    .filter((element) => element.group === 'edges')
+    .map((element) => element.data.id)
+    .sort();
+
+  assert.deepEqual(edgeIds(first), edgeIds(second));
+});
