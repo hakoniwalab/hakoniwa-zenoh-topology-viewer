@@ -8,16 +8,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(HAKO_ZENOH_TOPOLOGY_BUILD_TESTS "Build collector unit tests" ON)
+option(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH "Enable live Zenoh connectivity collection" ON)
 set(HAKO_PDU_REGISTRY_ROOT "" CACHE PATH "Path to hakoniwa-pdu-registry source tree")
 
-find_package(zenohc CONFIG REQUIRED)
 find_package(hakoniwa_pdu_endpoint CONFIG REQUIRED)
 find_package(fastcdr CONFIG REQUIRED)
 
-if(NOT ZENOHC_BUILD_WITH_UNSTABLE_API)
-    message(FATAL_ERROR
-        "zenoh-c must be built with ZENOHC_BUILD_WITH_UNSTABLE_API=true "
-        "because the Connectivity API is currently unstable.")
+if(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
+    find_package(zenohc CONFIG REQUIRED)
+    if(NOT ZENOHC_BUILD_WITH_UNSTABLE_API)
+        message(FATAL_ERROR
+            "zenoh-c must be built with ZENOHC_BUILD_WITH_UNSTABLE_API=true "
+            "because the Connectivity API is currently unstable.")
+    endif()
 endif()
 
 if(NOT HAKO_PDU_REGISTRY_ROOT)
@@ -42,9 +45,12 @@ target_include_directories(hako_zenoh_topology_model
 
 add_executable(hako-zenoh-topology-collector
     src/main.cpp
-    src/zenoh_collector.cpp
     src/topology_pdu_publisher.cpp
 )
+
+if(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
+    target_sources(hako-zenoh-topology-collector PRIVATE src/zenoh_collector.cpp)
+endif()
 
 target_include_directories(hako-zenoh-topology-collector
     PRIVATE
@@ -52,25 +58,30 @@ target_include_directories(hako-zenoh-topology-collector
         ${HAKO_PDU_TYPES_DIR}
 )
 
-target_compile_definitions(hako-zenoh-topology-collector
-    PRIVATE
-        Z_FEATURE_UNSTABLE_API
-)
-
-if(ZENOHC_BUILD_WITH_SHARED_MEMORY)
+if(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
     target_compile_definitions(hako-zenoh-topology-collector
         PRIVATE
-            Z_FEATURE_SHARED_MEMORY
+            HAKO_ZENOH_TOPOLOGY_WITH_ZENOH
+            Z_FEATURE_UNSTABLE_API
     )
+    if(ZENOHC_BUILD_WITH_SHARED_MEMORY)
+        target_compile_definitions(hako-zenoh-topology-collector
+            PRIVATE
+                Z_FEATURE_SHARED_MEMORY
+        )
+    endif()
 endif()
 
 target_link_libraries(hako-zenoh-topology-collector
     PRIVATE
         hako_zenoh_topology_model
-        zenohc::shared
         hakoniwa_pdu_endpoint::hakoniwa_pdu_endpoint
         fastcdr
 )
+
+if(HAKO_ZENOH_TOPOLOGY_WITH_ZENOH)
+    target_link_libraries(hako-zenoh-topology-collector PRIVATE zenohc::shared)
+endif()
 
 install(TARGETS hako-zenoh-topology-collector
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

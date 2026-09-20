@@ -12,7 +12,6 @@ const elements = {
   timestamp: document.querySelector('#timestamp'),
   wsUri: document.querySelector('#ws-uri'),
   connectButton: document.querySelector('#connect-button'),
-  sampleButton: document.querySelector('#sample-button'),
   fitButton: document.querySelector('#fit-button')
 };
 
@@ -21,22 +20,6 @@ const source = new PduTopologySource({
   onSnapshot: renderSnapshot,
   onStatus: setStatus
 });
-
-async function loadSample() {
-  setStatus('loading sample');
-  try {
-    const response = await fetch('/sample-topology.json', { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const snapshot = await response.json();
-    renderSnapshot(snapshot);
-    setStatus('sample');
-  } catch (error) {
-    setStatus('error');
-    elements.details.textContent = String(error);
-  }
-}
 
 async function connectLive() {
   try {
@@ -60,10 +43,4 @@ function setStatus(text) {
 }
 
 elements.connectButton.addEventListener('click', connectLive);
-elements.sampleButton.addEventListener('click', async () => {
-  await source.disconnect();
-  await loadSample();
-});
 elements.fitButton.addEventListener('click', () => view.fit());
-
-loadSample();

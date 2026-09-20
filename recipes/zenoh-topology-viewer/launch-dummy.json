@@ -1,0 +1,50 @@
+{
+  "version": "0.1",
+  "runtime": {
+    "cleanup_mmap_on_start": false
+  },
+  "defaults": {
+    "start_grace_sec": 1,
+    "delay_sec": 1,
+    "stdout": "../../work/recipes/zenoh-topology-viewer/logs/${asset}.out",
+    "stderr": "../../work/recipes/zenoh-topology-viewer/logs/${asset}.err"
+  },
+  "assets": [
+    {
+      "name": "topology-bridge",
+      "command": "${HAKO_PDU_BRIDGE_BIN:-../hakoniwa-pdu-bridge-core/build/hakoniwa-pdu-bridge}",
+      "args": [
+        "recipes/zenoh-topology-viewer/config/bridge/bridge.json",
+        "1000",
+        "recipes/zenoh-topology-viewer/config/endpoint/endpoint_container.json",
+        "zenoh_topology_bridge"
+      ],
+      "cwd": "../..",
+      "activation_timing": "before_start"
+    },
+    {
+      "name": "topology-web",
+      "command": "npm",
+      "args": ["run", "dev", "--", "--host", "127.0.0.1", "--port", "5173"],
+      "cwd": "../../web",
+      "depends_on": ["topology-bridge"],
+      "activation_timing": "before_start"
+    },
+    {
+      "name": "topology-collector",
+      "command": "collector/build/hako-zenoh-topology-collector",
+      "args": [
+        "--input-file",
+        "web/public/sample-topology.json",
+        "--endpoint-config",
+        "recipes/zenoh-topology-viewer/config/endpoint/collector-out.json",
+        "--publish-interval-ms",
+        "1000",
+        "--no-stdout"
+      ],
+      "cwd": "../..",
+      "depends_on": ["topology-bridge", "topology-web"],
+      "activation_timing": "before_start"
+    }
+  ]
+}

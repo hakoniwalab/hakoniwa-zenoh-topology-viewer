@@ -2,7 +2,7 @@ import {
   PduEncoding,
   PduManager,
   WebSocketCommunicationService
-} from 'hakoniwa-pdu-javascript';
+} from 'hakoniwa-pdu-javascript/browser';
 
 const ROBOT = 'ZenohTopology';
 const PDU = 'topology';

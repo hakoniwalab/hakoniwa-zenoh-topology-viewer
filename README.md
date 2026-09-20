@@ -2,6 +2,26 @@
 
 Hakoniwa-based Zenoh topology collector and browser viewer.
 
+## Current browser milestone
+
+The first runnable browser milestone does not require Zenoh, but it deliberately
+uses the real Hakoniwa transport path:
+
+```text
+web/public/sample-topology.json
+  -> C++ collector
+  -> hakoniwa-pdu-endpoint
+  -> TCP
+  -> hakoniwa-pdu-bridge-core
+  -> WebSocket
+  -> hakoniwa-pdu-javascript
+  -> Cytoscape.js
+```
+
+This isolates the input-source change while exercising Collector, Endpoint,
+Bridge, browser decoding, and rendering. Zenoh collection is the following
+integration stage.
+
 ## Project layout
 
 ```text

@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "cytoscape": "^3.33.1",
-    "hakoniwa-pdu-javascript": "^1.0.0"
+    "hakoniwa-pdu-javascript": "file:../../hakoniwa-pdu-javascript"
   },
   "devDependencies": {
     "vite": "^7.1.5"
