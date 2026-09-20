@@ -1,0 +1,12 @@
+version: 1
+id: zenoh-topology-viewer
+description: MVP recipe skeleton for Zenoh topology visualization.
+
+execution_environment:
+  workspace:
+    mode: managed
+
+# TODO:
+# - declare Foundation requirements
+# - generate recipe-local Endpoint / Bridge / PDU config
+# - launch collector, bridge, web server

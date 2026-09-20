@@ -1,0 +1,16 @@
+# Build outputs
+build/
+collector/build/
+web/node_modules/
+
+# Component-local resolved state
+.hako/
+
+# Local workspace/runtime outputs
+work/
+dist/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
