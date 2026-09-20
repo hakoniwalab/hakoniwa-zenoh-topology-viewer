@@ -36,6 +36,8 @@ export function syncCytoscapeElements(cy, nextElements) {
 export class TopologyView {
   constructor(container, detailsElement) {
     this.detailsElement = detailsElement;
+    this.selectedElementId = null;
+    this.summaryDetails = null;
     this.cy = cytoscape({
       container,
       elements: [],
@@ -119,7 +121,14 @@ export class TopologyView {
 
     this.cy.on('tap', 'node, edge', (event) => {
       const element = event.target;
+      this.selectedElementId = element.id();
       this.showDetails(element.data());
+    });
+    this.cy.on('tap', (event) => {
+      if (event.target === this.cy) {
+        this.selectedElementId = null;
+        this.showDetails(this.summaryDetails);
+      }
     });
   }
 
@@ -135,7 +144,7 @@ export class TopologyView {
         randomize: false
       }).run();
     }
-    this.showDetails({
+    this.summaryDetails = {
       schema: topology.schema,
       collector_zid: topology.collectorZid,
       nodes: topology.nodes.length,
@@ -143,7 +152,16 @@ export class TopologyView {
       links: topology.links.length,
       status: topology.status,
       sources: topology.sources
-    });
+    };
+    const selected = this.selectedElementId
+      ? this.cy.getElementById(this.selectedElementId)
+      : null;
+    if (selected && selected.length > 0) {
+      this.showDetails(selected.data());
+    } else {
+      this.selectedElementId = null;
+      this.showDetails(this.summaryDetails);
+    }
     return topology;
   }
 
