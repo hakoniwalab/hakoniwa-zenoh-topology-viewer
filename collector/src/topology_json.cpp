@@ -83,6 +83,9 @@ std::string to_json(const TopologySnapshot& snapshot)
         {"transports", json::array()},
         {"links", json::array()},
     };
+    if (!snapshot.collector_agent_id.empty()) {
+        root["collector"]["agent_id"] = snapshot.collector_agent_id;
+    }
     for (const auto& node : snapshot.nodes) root["nodes"].push_back(node_json(node));
     for (const auto& transport : snapshot.transports) root["transports"].push_back(transport_json(transport));
     for (const auto& link : snapshot.links) root["links"].push_back(link_json(link));
@@ -100,7 +103,10 @@ TopologySnapshot topology_from_json(const std::string& input)
         TopologySnapshot snapshot;
         snapshot.schema = root.at("schema").get<std::string>();
         snapshot.timestamp_ms = root.value("timestamp", std::uint64_t{0});
-        if (root.contains("collector")) snapshot.collector_zid = root.at("collector").value("zid", "");
+        if (root.contains("collector")) {
+            snapshot.collector_zid = root.at("collector").value("zid", "");
+            snapshot.collector_agent_id = root.at("collector").value("agent_id", "");
+        }
         snapshot.status = root.value("status", "complete");
 
         for (const auto& value : root.value("sources", json::array())) {

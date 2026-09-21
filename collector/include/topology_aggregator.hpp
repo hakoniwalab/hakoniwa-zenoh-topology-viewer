@@ -18,6 +18,7 @@ struct Inventory {
     std::uint64_t refresh_interval_ms{1000};
     std::uint64_t stale_after_ms{5000};
     std::string endpoint_mux_config;
+    bool dynamic_targets{false};
     std::vector<InventoryTarget> targets;
 };
 

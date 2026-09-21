@@ -3,16 +3,6 @@
   "refresh_interval_ms": 1000,
   "stale_after_ms": 5000,
   "endpoint_mux_config": "node-a-agent-mux.json",
-  "targets": [
-    {
-      "name": "node-b-router",
-      "role": "router",
-      "expected_zid": "b"
-    },
-    {
-      "name": "node-c-peer",
-      "role": "peer",
-      "expected_zid": "c"
-    }
-  ]
+  "dynamic_targets": true,
+  "targets": []
 }

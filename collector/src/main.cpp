@@ -4,6 +4,7 @@
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -137,6 +138,12 @@ int main(int argc, char** argv)
         std::vector<std::optional<hako::zenoh_topology::TopologySnapshot>> latest_observations;
         std::vector<std::optional<std::chrono::steady_clock::time_point>> last_received_times;
         std::vector<std::optional<std::uint64_t>> last_received_at_ms;
+        struct DynamicObservation {
+            hako::zenoh_topology::TopologySnapshot snapshot;
+            std::chrono::steady_clock::time_point last_received_time;
+            std::uint64_t last_received_at_ms;
+        };
+        std::map<std::string, DynamicObservation> dynamic_observations;
         if (inventory.has_value()) {
             latest_observations.resize(inventory->targets.size());
             last_received_times.resize(inventory->targets.size());
@@ -181,22 +188,36 @@ int main(int argc, char** argv)
                             while (auto json = (*it)->receive_json()) latest_json = std::move(*json);
                             if (latest_json.has_value()) {
                                 auto snapshot = hako::zenoh_topology::topology_from_json(*latest_json);
-                                const auto target_it = std::find_if(
-                                    inventory->targets.begin(), inventory->targets.end(),
-                                    [&](const auto& target) {
-                                        return target.expected_zid == snapshot.collector_zid;
-                                    });
-                                if (target_it == inventory->targets.end()) {
-                                    throw std::runtime_error(
-                                        "received topology from unknown zid " + snapshot.collector_zid);
+                                if (snapshot.collector_zid.empty()) {
+                                    throw std::runtime_error("received topology without collector zid");
                                 }
-                                const auto index = static_cast<std::size_t>(
-                                    std::distance(inventory->targets.begin(), target_it));
-                                if (!latest_observations[index].has_value()
-                                    || snapshot.timestamp_ms >= latest_observations[index]->timestamp_ms) {
-                                    latest_observations[index] = std::move(snapshot);
-                                    last_received_times[index] = std::chrono::steady_clock::now();
-                                    last_received_at_ms[index] = system_now_ms();
+                                if (inventory->dynamic_targets) {
+                                    const auto observation_id = snapshot.collector_agent_id.empty()
+                                        ? snapshot.collector_zid : snapshot.collector_agent_id;
+                                    const auto found = dynamic_observations.find(observation_id);
+                                    if (found == dynamic_observations.end()
+                                        || snapshot.timestamp_ms >= found->second.snapshot.timestamp_ms) {
+                                        dynamic_observations.insert_or_assign(observation_id, DynamicObservation{
+                                            std::move(snapshot), std::chrono::steady_clock::now(), system_now_ms()});
+                                    }
+                                } else {
+                                    const auto target_it = std::find_if(
+                                        inventory->targets.begin(), inventory->targets.end(),
+                                        [&](const auto& target) {
+                                            return target.expected_zid == snapshot.collector_zid;
+                                        });
+                                    if (target_it == inventory->targets.end()) {
+                                        throw std::runtime_error(
+                                            "received topology from unknown zid " + snapshot.collector_zid);
+                                    }
+                                    const auto index = static_cast<std::size_t>(
+                                        std::distance(inventory->targets.begin(), target_it));
+                                    if (!latest_observations[index].has_value()
+                                        || snapshot.timestamp_ms >= latest_observations[index]->timestamp_ms) {
+                                        latest_observations[index] = std::move(snapshot);
+                                        last_received_times[index] = std::chrono::steady_clock::now();
+                                        last_received_at_ms[index] = system_now_ms();
+                                    }
                                 }
                             }
                         } catch (const std::exception& e) {
@@ -233,29 +254,51 @@ int main(int argc, char** argv)
                     }
                 }
 
-                for (std::size_t i = 0; i < inventory->targets.size(); ++i) {
-                    const auto& target = inventory->targets[i];
-                    if (target_errors[i].has_value()) {
-                        failures.push_back({target.name, target.role, target.endpoint_config,
-                                            "", "error", *target_errors[i]});
-                    } else if (latest_observations[i].has_value()) {
+                if (inventory->dynamic_targets) {
+                    for (const auto& [observation_id, state] : dynamic_observations) {
                         const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::steady_clock::now() - *last_received_times[i]).count();
+                            std::chrono::steady_clock::now() - state.last_received_time).count();
+                        const auto& zid = state.snapshot.collector_zid;
+                        const hako::zenoh_topology::InventoryTarget target{
+                            observation_id, "unknown", inventory->endpoint_mux_config, zid};
                         if (elapsed_ms >= static_cast<std::int64_t>(inventory->stale_after_ms)) {
                             observations.push_back({
                                 target,
-                                *latest_observations[i],
+                                state.snapshot,
                                 "stale",
                                 "no topology PDU received for " + std::to_string(elapsed_ms) + " ms",
-                                last_received_at_ms[i],
+                                state.last_received_at_ms,
                             });
                         } else {
                             observations.push_back({
-                                target, *latest_observations[i], "ok", "", last_received_at_ms[i]});
+                                target, state.snapshot, "ok", "", state.last_received_at_ms});
                         }
-                    } else {
-                        failures.push_back({target.name, target.role, target.endpoint_config,
-                                            "", "waiting", "no topology PDU received yet"});
+                    }
+                } else {
+                    for (std::size_t i = 0; i < inventory->targets.size(); ++i) {
+                        const auto& target = inventory->targets[i];
+                        if (target_errors[i].has_value()) {
+                            failures.push_back({target.name, target.role, target.endpoint_config,
+                                                "", "error", *target_errors[i]});
+                        } else if (latest_observations[i].has_value()) {
+                            const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - *last_received_times[i]).count();
+                            if (elapsed_ms >= static_cast<std::int64_t>(inventory->stale_after_ms)) {
+                                observations.push_back({
+                                    target,
+                                    *latest_observations[i],
+                                    "stale",
+                                    "no topology PDU received for " + std::to_string(elapsed_ms) + " ms",
+                                    last_received_at_ms[i],
+                                });
+                            } else {
+                                observations.push_back({
+                                    target, *latest_observations[i], "ok", "", last_received_at_ms[i]});
+                            }
+                        } else {
+                            failures.push_back({target.name, target.role, target.endpoint_config,
+                                                "", "waiting", "no topology PDU received yet"});
+                        }
                     }
                 }
                 return hako::zenoh_topology::to_json(

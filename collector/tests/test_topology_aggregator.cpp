@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -40,6 +42,23 @@ TopologySnapshot observation(
 
 int main()
 {
+    const auto dynamic_inventory_path =
+        std::filesystem::temp_directory_path() / "hako-topology-dynamic-inventory.json";
+    {
+        std::ofstream output(dynamic_inventory_path);
+        output << R"({
+          "schema": "hakoniwa.zenoh.inventory/v1",
+          "endpoint_mux_config": "aggregator-mux.json",
+          "dynamic_targets": true,
+          "targets": []
+        })";
+    }
+    const auto dynamic_inventory = load_inventory(dynamic_inventory_path.string());
+    std::filesystem::remove(dynamic_inventory_path);
+    assert(dynamic_inventory.dynamic_targets);
+    assert(dynamic_inventory.targets.empty());
+    assert(!dynamic_inventory.endpoint_mux_config.empty());
+
     const InventoryTarget router{"router", "router", "router-in.json", "router-zid"};
     const InventoryTarget peer{"peer", "peer", "peer-in.json", "peer-zid"};
     std::vector<TargetObservation> observations = {

@@ -169,7 +169,7 @@ link数です。3 Peer完全メッシュでは通常 `3 links` です。
 | `transports` | Agentごとのtransport観測数 |
 | `links` | 重複排除後のlink数 |
 | `status` | Aggregatorの状態。`complete` または `partial` |
-| `sources` | inventoryに定義された各Topology Agentの取得状態 |
+| `sources` | Aggregatorが認識している各Topology Agentの取得状態 |
 
 画面上部では、JSONの `complete` を利用者向けに `connected` と表示します。
 
@@ -177,8 +177,8 @@ link数です。3 Peer完全メッシュでは通常 `3 links` です。
 
 | フィールド | 意味 |
 | --- | --- |
-| `name` | inventoryで付けた観測対象名 |
-| `role` | inventory上の役割。現在は `peer` または `router` |
+| `name` | 観測対象名。動的受付ではAgentの安定識別子（Docker演習では `node_a` など） |
+| `role` | 観測対象の役割。動的受付では `unknown` |
 | `endpoint` | Agent snapshotを受信するHakoniwa PDU Endpoint設定。Zenoh link endpointではない |
 | `zid` | そのAgentが観測しているZenoh sessionのZID |
 | `status` | `ok`、`waiting`、`error`、`stale` のいずれか |

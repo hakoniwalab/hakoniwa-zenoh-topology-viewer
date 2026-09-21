@@ -69,7 +69,9 @@ Inventory load_inventory(const std::string& path)
             if (mux_config.is_relative()) mux_config = base_dir / mux_config;
             result.endpoint_mux_config = mux_config.lexically_normal().string();
         }
-        for (const auto& value : root.at("targets")) {
+        result.dynamic_targets = root.value("dynamic_targets", false);
+        const auto targets = root.value("targets", nlohmann::json::array());
+        for (const auto& value : targets) {
             InventoryTarget target;
             target.name = value.at("name").get<std::string>();
             target.role = value.at("role").get<std::string>();
@@ -87,7 +89,16 @@ Inventory load_inventory(const std::string& path)
             }
             result.targets.push_back(std::move(target));
         }
-        if (result.targets.empty()) throw std::runtime_error("inventory must contain at least one target");
+        if (result.dynamic_targets) {
+            if (result.endpoint_mux_config.empty()) {
+                throw std::runtime_error("dynamic inventory requires endpoint_mux_config");
+            }
+            if (!result.targets.empty()) {
+                throw std::runtime_error("dynamic inventory must not define fixed targets");
+            }
+        } else if (result.targets.empty()) {
+            throw std::runtime_error("inventory must contain at least one target");
+        }
         return result;
     } catch (const nlohmann::json::exception& e) {
         throw std::runtime_error(std::string("invalid inventory JSON: ") + e.what());

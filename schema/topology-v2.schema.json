@@ -16,7 +16,7 @@
         "required": ["name", "role", "endpoint", "status"],
         "properties": {
           "name": { "type": "string" },
-          "role": { "enum": ["router", "peer"] },
+          "role": { "enum": ["router", "peer", "unknown"] },
           "endpoint": { "type": "string" },
           "zid": { "type": "string" },
           "status": { "enum": ["ok", "waiting", "error", "stale"] },

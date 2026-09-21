@@ -15,10 +15,22 @@
 
 namespace {
 
+std::string resolve_agent_id(const std::string& node_name)
+{
+    if (const char* value = std::getenv("HAKO_TOPOLOGY_AGENT_ID"); value != nullptr && value[0] != '\0') {
+        return value;
+    }
+    if (const char* hostname = std::getenv("HOSTNAME"); hostname != nullptr && hostname[0] != '\0') {
+        return node_name.empty() ? hostname : std::string(hostname) + ":" + node_name;
+    }
+    return node_name;
+}
+
 class AgentRuntime {
 public:
     AgentRuntime(const z_loaned_session_t* session, std::string node_name, std::string endpoint, std::uint64_t interval_ms)
-        : session_(session), node_name_(std::move(node_name)), publisher_(std::move(endpoint)), interval_ms_(interval_ms)
+        : session_(session), node_name_(std::move(node_name)), agent_id_(resolve_agent_id(node_name_)),
+          publisher_(std::move(endpoint)), interval_ms_(interval_ms)
     {
         publisher_.start();
         worker_ = std::thread([this] { run(); });
@@ -36,6 +48,7 @@ private:
         while (!stop_.load()) {
             try {
                 auto snapshot = hako::zenoh_topology::collect_session_topology(session_);
+                snapshot.collector_agent_id = agent_id_;
                 publisher_.publish_json(hako::zenoh_topology::to_json(snapshot));
             } catch (const std::exception& e) {
                 std::cerr << "topology agent [" << node_name_ << "] error: " << e.what() << std::endl;
@@ -49,6 +62,7 @@ private:
 
     const z_loaned_session_t* session_;
     std::string node_name_;
+    std::string agent_id_;
     hako::zenoh_topology::TopologyPduPublisher publisher_;
     std::uint64_t interval_ms_;
     std::atomic<bool> stop_{false};

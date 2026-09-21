@@ -8,9 +8,9 @@
     "refresh_interval_ms": { "type": "integer", "minimum": 1 },
     "stale_after_ms": { "type": "integer", "minimum": 1, "default": 5000 },
     "endpoint_mux_config": { "type": "string", "minLength": 1 },
+    "dynamic_targets": { "type": "boolean", "default": false },
     "targets": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["name", "role"],
@@ -24,5 +24,20 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "dynamic_targets": { "const": true } },
+        "required": ["dynamic_targets"]
+      },
+      "then": {
+        "required": ["endpoint_mux_config"],
+        "properties": { "targets": { "maxItems": 0 } }
+      },
+      "else": {
+        "properties": { "targets": { "minItems": 1 } }
+      }
+    }
+  ],
   "additionalProperties": false
 }
