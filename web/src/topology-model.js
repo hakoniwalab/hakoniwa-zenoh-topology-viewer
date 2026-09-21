@@ -69,12 +69,18 @@ export function normalizeTopology(snapshot) {
 
 export function toCytoscapeElements(snapshot) {
   const topology = normalizeTopology(snapshot);
+  const sourceNameByZid = new Map(
+    topology.sources
+      .filter((source) => source.zid && source.name)
+      .map((source) => [source.zid, source.name])
+  );
 
   const nodeElements = topology.nodes.map((node) => ({
     group: 'nodes',
     data: {
       id: node.zid,
-      label: shortZid(node.zid),
+      label: sourceNameByZid.get(node.zid) ?? shortZid(node.zid),
+      name: sourceNameByZid.get(node.zid) ?? '',
       zid: node.zid,
       mode: node.mode || 'unknown',
       collector: node.zid === topology.collectorZid,

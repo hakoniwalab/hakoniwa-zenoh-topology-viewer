@@ -49,15 +49,16 @@ Aggregatorが生成するv2 snapshotでは複数Agentの情報を統合するた
 
 ## 3. ノードのラベル
 
-図形の下に表示される文字列はZenoh ID、つまり `zid` です。
+図形の下には、対応するTopology Agentを特定できる場合はAgent名を表示します。
+Docker演習では `node_a:sub` や `node_b:pub` のように、実行ノードと
+サンプル種別を組み合わせた名前になります。
 
-- `a`、`b`、`c` のように設定で短いIDを指定した場合は、そのまま表示します
+- Agentが観測していない接続相手など、名前が分からないノードはZIDを表示します
 - 12文字を超えるZIDは、先頭6文字と末尾4文字を
   `123456…cdef` のように省略表示します
-- 完全なZIDはノードをクリックし、Detailsの `zid` で確認できます
+- 完全なZIDは常にノードをクリックし、Detailsの `zid` で確認できます
 
-ラベルはアプリケーション名やコンテナ名ではありません。講義用設定では
-分かりやすくするため、Zenoh sessionのIDを `a`、`b`、`c` に固定しています。
+Agent名は表示用の識別子であり、Zenoh sessionのZIDそのものではありません。
 
 ## 4. 線の意味
 
@@ -177,7 +178,7 @@ link数です。3 Peer完全メッシュでは通常 `3 links` です。
 
 | フィールド | 意味 |
 | --- | --- |
-| `name` | 観測対象名。動的受付ではAgentの安定識別子（Docker演習では `node_a` など） |
+| `name` | 観測対象名。動的受付ではAgentの安定識別子（Docker演習では `node_a:sub` など） |
 | `role` | 観測対象の役割。動的受付では `unknown` |
 | `endpoint` | Agent snapshotを受信するHakoniwa PDU Endpoint設定。Zenoh link endpointではない |
 | `zid` | そのAgentが観測しているZenoh sessionのZID |
@@ -210,7 +211,8 @@ link数です。3 Peer完全メッシュでは通常 `3 links` です。
 | フィールド | 意味 |
 | --- | --- |
 | `id` | Viewer内部で使用する要素ID。ノードではZIDと同じ |
-| `label` | 図の下に表示する短縮済みZID |
+| `label` | 図の下に表示するAgent名。名前が分からない場合は短縮済みZID |
+| `name` | 対応するTopology Agent名。名前が分からない場合は空文字列 |
 | `zid` | 完全なZenoh ID |
 | `mode` | `peer`、`router`、`client`、`unknown` のいずれか |
 | `collector` | 単独Collector自身なら `true` |

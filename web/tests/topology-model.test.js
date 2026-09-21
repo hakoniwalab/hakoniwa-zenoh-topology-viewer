@@ -101,7 +101,10 @@ test('v2 stale source marks its node and links as stale', () => {
   assert.equal(topology.sources[0].status, 'stale');
 
   const elements = toCytoscapeElements(snapshot);
-  assert.equal(elements.find((item) => item.group === 'nodes' && item.data.id === 'peer-a').data.stale, true);
+  const peerNode = elements.find((item) => item.group === 'nodes' && item.data.id === 'peer-a');
+  assert.equal(peerNode.data.stale, true);
+  assert.equal(peerNode.data.label, 'node-a');
+  assert.equal(peerNode.data.zid, 'peer-a');
   assert.equal(elements.find((item) => item.group === 'edges').data.stale, true);
 });
 

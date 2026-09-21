@@ -18,7 +18,7 @@ namespace {
 std::string resolve_agent_id(const std::string& node_name)
 {
     if (const char* value = std::getenv("HAKO_TOPOLOGY_AGENT_ID"); value != nullptr && value[0] != '\0') {
-        return value;
+        return node_name.empty() ? value : std::string(value) + ":" + node_name;
     }
     if (const char* hostname = std::getenv("HOSTNAME"); hostname != nullptr && hostname[0] != '\0') {
         return node_name.empty() ? hostname : std::string(hostname) + ":" + node_name;
