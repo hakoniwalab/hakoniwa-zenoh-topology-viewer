@@ -1,35 +1,71 @@
-# zenoh-topology-viewer Recipe
+# zenoh-topology-viewer development Recipe
 
-This Recipe connects the C++ collector to the browser through Hakoniwa PDU Endpoint / Bridge.
+This directory contains the **development / dummy-data** Recipe assets kept in
+this repository.
 
-## Runtime path
+For the current live multi-agent topology exercise, use Hakoniwa Business Pack
+and the tutorial setup documented here:
+
+- [zenoh-tutorial: 06 ブラウザでZenoh接続Topologyを確認する](https://github.com/tmori/zenoh-tutorial/blob/main/docs/06-viewer-setup.md)
+
+The live architecture is:
 
 ```text
-collector
-  -> TCP Endpoint (9101)
-  -> hakoniwa-pdu-bridge
-  -> WebSocket Endpoint (8765)
+real Zenoh sessions
+  -> attached Topology Agents
+  -> Hakoniwa PDU Endpoint / TCP multiplexer
+  -> Aggregator
+  -> aggregated topology v2
+  -> Hakoniwa PDU Endpoint
+  -> PDU Bridge
+  -> WebSocket
+  -> Browser
+```
+
+See [../../docs/architecture.md](../../docs/architecture.md) for details.
+
+## Purpose of this local Recipe
+
+The files under `recipes/zenoh-topology-viewer/` are still useful for a
+small, Zenoh-independent regression path:
+
+```text
+web/public/sample-topology.json
+  -> C++ collector
+  -> Hakoniwa PDU Endpoint
+  -> TCP
+  -> hakoniwa-pdu-bridge-core
+  -> WebSocket
   -> hakoniwa-pdu-javascript
   -> browser
 ```
 
-The topology payload is:
+This verifies the collector output, PDU transport, Bridge, WebSocket, browser
+CDR conversion, and graph rendering without requiring a live Zenoh session.
+
+The dummy input file currently uses the original
+`hakoniwa.zenoh.topology/v1` sample schema. Live multi-agent aggregation emits
+`hakoniwa.zenoh.topology/v2`.
+
+## PDU transport
+
+The topology payload is carried as:
 
 - PDU: `ZenohTopology/topology`
 - type: `std_msgs/String`
 - encoding: CDR
-- string body: `hakoniwa.zenoh.topology/v1` JSON
+- string body: topology JSON
 
-The configured `pdu_size` is 256 KiB and is used as bridge receive capacity. The actual CDR payload is variable length.
+The CDR string payload is variable length. Endpoint/Bridge configuration defines
+receive capacity; the actual received payload length is preserved through the
+Bridge.
 
-This Recipe depends on the Bridge behavior that forwards only `received_size` bytes for variable-length PDU payloads.
+## Launcher-managed dummy demo
 
-## Launcher-managed dummy-data demo
+The Hakoniwa Launcher can own the Bridge, Vite web server, and long-running
+file-backed Collector as one lifecycle.
 
-The Hakoniwa Launcher from `hakoniwa-pdu-python` owns the Bridge, Vite web
-server, and long-running file-backed Collector as one lifecycle.
-
-Start the three processes without invoking `hako-cmd start`:
+Start the three processes without invoking Hakoniwa Core:
 
 ```bash
 PYTHONPATH=../hakoniwa-pdu-python/src \
@@ -57,7 +93,7 @@ python -m hakoniwa_pdu.apps.launcher.hako_launcher_ctl \
 
 `HAKO_PDU_BRIDGE_BIN` may override the Bridge executable path.
 
-## Manual startup
+## Manual dummy startup
 
 ### 1. Start the Bridge
 
@@ -71,7 +107,7 @@ hakoniwa-pdu-bridge \
   zenoh_topology_bridge
 ```
 
-### 2. Start the Browser and connect WebSocket
+### 2. Start the Browser
 
 ```bash
 cd web
@@ -79,10 +115,9 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL, keep `ws://127.0.0.1:8765`, and press **Connect**. The
-periodic collector below may be started before or after the browser connects.
+Open the Vite URL, keep `ws://127.0.0.1:8765`, and press **Connect**.
 
-### 3. Run the Collector with dummy data
+### 3. Run the file-backed Collector
 
 ```bash
 hako-zenoh-topology-collector \
@@ -92,7 +127,18 @@ hako-zenoh-topology-collector \
   --no-stdout
 ```
 
-This exercises Collector, Endpoint, Bridge, WebSocket, browser-side CDR decode,
-and graph rendering without opening a Zenoh session. The collector re-reads and
-publishes the file every second until it is stopped. Live Zenoh collection is a
-follow-up step.
+## Live setup
+
+Do not use this dummy Recipe as the reference architecture for the live Viewer.
+
+The live lecture/demo setup is owned by:
+
+- `tmori/zenoh-tutorial` for the Zenoh exercises and optional agent-enabled samples;
+- `hakoniwa-business-pack` for Foundation build/install and Launcher lifecycle;
+- this repository for the Topology Agent, Aggregator, schemas, and browser viewer.
+
+See:
+
+- [Architecture](../../docs/architecture.md)
+- [Viewer guide](../../docs/viewer-guide.md)
+- [Development guide](../../docs/development.md)
