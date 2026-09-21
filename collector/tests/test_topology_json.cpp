@@ -14,7 +14,7 @@ int main()
     TopologySnapshot snapshot;
     snapshot.timestamp_ms = 1234;
     snapshot.collector_zid = "collector-\"a";
-    snapshot.collector_agent_id = "node-a:pub";
+    snapshot.collector_agent_name = "client-a";
     snapshot.nodes = {
         NodeInfo{"peer-a", "peer"},
         NodeInfo{"router-r", "router"},
@@ -43,13 +43,13 @@ int main()
     assert(json.find("\"schema\":\"hakoniwa.zenoh.topology/v1\"") != std::string::npos);
     assert(json.find("\"timestamp\":1234") != std::string::npos);
     assert(json.find("collector-\\\"a") != std::string::npos);
-    assert(json.find("\"agent_id\":\"node-a:pub\"") != std::string::npos);
+    assert(json.find("\"name\":\"client-a\"") != std::string::npos);
     assert(json.find("\"mode\":\"peer\"") != std::string::npos);
     assert(json.find("\"protocol\":\"tcp\"") != std::string::npos);
     assert(json.find("\"reliability\":\"reliable\"") != std::string::npos);
 
     const auto restored = hako::zenoh_topology::topology_from_json(json);
-    assert(restored.collector_agent_id == "node-a:pub");
+    assert(restored.collector_agent_name == "client-a");
 
     return 0;
 }

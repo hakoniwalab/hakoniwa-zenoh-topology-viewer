@@ -84,12 +84,12 @@ services:
       node_a:
         condition: service_healthy
     environment:
-      HAKO_TOPOLOGY_AGENT_ID: node_b
       HAKO_TOPOLOGY_ENDPOINT_CONFIG: /workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-b-agent-out.json
       HAKO_TOPOLOGY_INTERVAL_MS: "1000"
     command:
       - /opt/hakoniwa/bin/zenoh-tutorial-pub
       - -A
+      - node_b-pub
       - -c
       - /workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-b-zenoh.json5
     volumes: *sources
@@ -112,12 +112,12 @@ services:
       node_b:
         condition: service_healthy
     environment:
-      HAKO_TOPOLOGY_AGENT_ID: node_c
       HAKO_TOPOLOGY_ENDPOINT_CONFIG: /workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-c-agent-out.json
       HAKO_TOPOLOGY_INTERVAL_MS: "1000"
     command:
       - /opt/hakoniwa/bin/zenoh-tutorial-sub
       - -A
+      - node_c-sub
       - -c
       - /workspace/hakoniwa-zenoh-topology-viewer/docker/config/node-c-zenoh.json5
     volumes: *sources

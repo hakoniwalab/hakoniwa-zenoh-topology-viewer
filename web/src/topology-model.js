@@ -74,19 +74,29 @@ export function toCytoscapeElements(snapshot) {
       .filter((source) => source.zid && source.name)
       .map((source) => [source.zid, source.name])
   );
+  const sourceNameCounts = new Map();
+  for (const name of sourceNameByZid.values()) {
+    sourceNameCounts.set(name, (sourceNameCounts.get(name) ?? 0) + 1);
+  }
 
-  const nodeElements = topology.nodes.map((node) => ({
-    group: 'nodes',
-    data: {
-      id: node.zid,
-      label: sourceNameByZid.get(node.zid) ?? shortZid(node.zid),
-      name: sourceNameByZid.get(node.zid) ?? '',
-      zid: node.zid,
-      mode: node.mode || 'unknown',
-      collector: node.zid === topology.collectorZid,
-      stale: topology.staleZids.has(node.zid)
-    }
-  }));
+  const nodeElements = topology.nodes.map((node) => {
+    const name = sourceNameByZid.get(node.zid) ?? '';
+    const label = name
+      ? (sourceNameCounts.get(name) > 1 ? `${name} (${shortZid(node.zid)})` : name)
+      : shortZid(node.zid);
+    return {
+      group: 'nodes',
+      data: {
+        id: node.zid,
+        label,
+        name,
+        zid: node.zid,
+        mode: node.mode || 'unknown',
+        collector: node.zid === topology.collectorZid,
+        stale: topology.staleZids.has(node.zid)
+      }
+    };
+  });
 
   const edgeElements = [];
   const edgeSource = topology.links.length > 0 ? topology.links : topology.transports;

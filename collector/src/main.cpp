@@ -142,8 +142,11 @@ int main(int argc, char** argv)
             hako::zenoh_topology::TopologySnapshot snapshot;
             std::chrono::steady_clock::time_point last_received_time;
             std::uint64_t last_received_at_ms;
+            bool connected{true};
         };
         std::map<std::string, DynamicObservation> dynamic_observations;
+        std::map<const hako::zenoh_topology::TopologyPduSubscriber*, std::string>
+            dynamic_connection_zids;
         if (inventory.has_value()) {
             latest_observations.resize(inventory->targets.size());
             last_received_times.resize(inventory->targets.size());
@@ -183,6 +186,7 @@ int main(int argc, char** argv)
                     for (auto& subscriber : accepted) subscribers.push_back(std::move(subscriber));
 
                     for (auto it = subscribers.begin(); it != subscribers.end();) {
+                        auto* subscriber_ptr = it->get();
                         try {
                             std::optional<std::string> latest_json;
                             while (auto json = (*it)->receive_json()) latest_json = std::move(*json);
@@ -192,14 +196,27 @@ int main(int argc, char** argv)
                                     throw std::runtime_error("received topology without collector zid");
                                 }
                                 if (inventory->dynamic_targets) {
-                                    const auto observation_id = snapshot.collector_agent_id.empty()
-                                        ? snapshot.collector_zid : snapshot.collector_agent_id;
-                                    const auto found = dynamic_observations.find(observation_id);
+                                    const auto zid = snapshot.collector_zid;
+                                    if (!snapshot.collector_agent_name.empty()) {
+                                        for (auto old = dynamic_observations.begin();
+                                             old != dynamic_observations.end();) {
+                                            if (old->first != zid && !old->second.connected
+                                                && old->second.snapshot.collector_agent_name
+                                                    == snapshot.collector_agent_name) {
+                                                old = dynamic_observations.erase(old);
+                                            } else {
+                                                ++old;
+                                            }
+                                        }
+                                    }
+                                    const auto found = dynamic_observations.find(zid);
                                     if (found == dynamic_observations.end()
                                         || snapshot.timestamp_ms >= found->second.snapshot.timestamp_ms) {
-                                        dynamic_observations.insert_or_assign(observation_id, DynamicObservation{
-                                            std::move(snapshot), std::chrono::steady_clock::now(), system_now_ms()});
+                                        dynamic_observations.insert_or_assign(zid, DynamicObservation{
+                                            std::move(snapshot), std::chrono::steady_clock::now(),
+                                            system_now_ms(), true});
                                     }
+                                    dynamic_connection_zids.insert_or_assign(subscriber_ptr, zid);
                                 } else {
                                     const auto target_it = std::find_if(
                                         inventory->targets.begin(), inventory->targets.end(),
@@ -225,6 +242,16 @@ int main(int argc, char** argv)
                                                 "", "error", e.what()});
                         }
                         if (!(*it)->is_running()) {
+                            if (inventory->dynamic_targets) {
+                                const auto connection = dynamic_connection_zids.find(subscriber_ptr);
+                                if (connection != dynamic_connection_zids.end()) {
+                                    const auto observation = dynamic_observations.find(connection->second);
+                                    if (observation != dynamic_observations.end()) {
+                                        observation->second.connected = false;
+                                    }
+                                    dynamic_connection_zids.erase(connection);
+                                }
+                            }
                             it = subscribers.erase(it);
                         } else {
                             ++it;
@@ -255,12 +282,13 @@ int main(int argc, char** argv)
                 }
 
                 if (inventory->dynamic_targets) {
-                    for (const auto& [observation_id, state] : dynamic_observations) {
+                    for (const auto& [zid, state] : dynamic_observations) {
                         const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                             std::chrono::steady_clock::now() - state.last_received_time).count();
-                        const auto& zid = state.snapshot.collector_zid;
+                        const auto& agent_name = state.snapshot.collector_agent_name;
                         const hako::zenoh_topology::InventoryTarget target{
-                            observation_id, "unknown", inventory->endpoint_mux_config, zid};
+                            agent_name.empty() ? zid : agent_name,
+                            "unknown", inventory->endpoint_mux_config, zid};
                         if (elapsed_ms >= static_cast<std::int64_t>(inventory->stale_after_ms)) {
                             observations.push_back({
                                 target,

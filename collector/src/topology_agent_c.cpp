@@ -15,22 +15,11 @@
 
 namespace {
 
-std::string resolve_agent_id(const std::string& node_name)
-{
-    if (const char* value = std::getenv("HAKO_TOPOLOGY_AGENT_ID"); value != nullptr && value[0] != '\0') {
-        return node_name.empty() ? value : std::string(value) + ":" + node_name;
-    }
-    if (const char* hostname = std::getenv("HOSTNAME"); hostname != nullptr && hostname[0] != '\0') {
-        return node_name.empty() ? hostname : std::string(hostname) + ":" + node_name;
-    }
-    return node_name;
-}
-
 class AgentRuntime {
 public:
-    AgentRuntime(const z_loaned_session_t* session, std::string node_name, std::string endpoint, std::uint64_t interval_ms)
-        : session_(session), node_name_(std::move(node_name)), agent_id_(resolve_agent_id(node_name_)),
-          publisher_(std::move(endpoint)), interval_ms_(interval_ms)
+    AgentRuntime(const z_loaned_session_t* session, std::string display_name, std::string endpoint, std::uint64_t interval_ms)
+        : session_(session), display_name_(std::move(display_name)), publisher_(std::move(endpoint)),
+          interval_ms_(interval_ms)
     {
         publisher_.start();
         worker_ = std::thread([this] { run(); });
@@ -48,10 +37,10 @@ private:
         while (!stop_.load()) {
             try {
                 auto snapshot = hako::zenoh_topology::collect_session_topology(session_);
-                snapshot.collector_agent_id = agent_id_;
+                snapshot.collector_agent_name = display_name_;
                 publisher_.publish_json(hako::zenoh_topology::to_json(snapshot));
             } catch (const std::exception& e) {
-                std::cerr << "topology agent [" << node_name_ << "] error: " << e.what() << std::endl;
+                std::cerr << "topology agent [" << display_name_ << "] error: " << e.what() << std::endl;
             }
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(interval_ms_);
             while (!stop_.load() && std::chrono::steady_clock::now() < deadline) {
@@ -61,8 +50,7 @@ private:
     }
 
     const z_loaned_session_t* session_;
-    std::string node_name_;
-    std::string agent_id_;
+    std::string display_name_;
     hako::zenoh_topology::TopologyPduPublisher publisher_;
     std::uint64_t interval_ms_;
     std::atomic<bool> stop_{false};
@@ -74,9 +62,9 @@ std::unique_ptr<AgentRuntime> agent;
 
 }  // namespace
 
-extern "C" int hako_topology_agent_attach(const z_loaned_session_t* session, const char* node_name)
+extern "C" int hako_topology_agent_attach(const z_loaned_session_t* session, const char* display_name)
 {
-    if (session == nullptr) return -1;
+    if (session == nullptr || display_name == nullptr || display_name[0] == '\0') return -1;
     const char* endpoint = std::getenv("HAKO_TOPOLOGY_ENDPOINT_CONFIG");
     if (endpoint == nullptr || endpoint[0] == '\0') {
         std::cerr << "HAKO_TOPOLOGY_ENDPOINT_CONFIG is required when the topology agent is enabled" << std::endl;
@@ -94,7 +82,7 @@ extern "C" int hako_topology_agent_attach(const z_loaned_session_t* session, con
     try {
         std::lock_guard lock(agent_mutex);
         if (agent) return -1;
-        agent = std::make_unique<AgentRuntime>(session, node_name == nullptr ? "" : node_name, endpoint, interval_ms);
+        agent = std::make_unique<AgentRuntime>(session, display_name, endpoint, interval_ms);
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "failed to attach topology agent: " << e.what() << std::endl;

@@ -52,7 +52,7 @@ struct TopologySnapshot {
     std::string schema{"hakoniwa.zenoh.topology/v1"};
     std::uint64_t timestamp_ms{0};
     std::string collector_zid;
-    std::string collector_agent_id;
+    std::string collector_agent_name;
     std::vector<NodeInfo> nodes;
     std::vector<TransportInfo> transports;
     std::vector<LinkInfo> links;

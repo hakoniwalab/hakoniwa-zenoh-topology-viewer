@@ -135,6 +135,30 @@ test('link remains fresh when at least one observer is fresh', () => {
   assert.equal(elements.find((item) => item.group === 'edges').data.stale, false);
 });
 
+test('duplicate agent names remain distinct and include shortened ZIDs', () => {
+  const duplicateNames = {
+    schema: 'hakoniwa.zenoh.topology/v2',
+    nodes: [
+      { zid: '1234567890abcdef', mode: 'peer' },
+      { zid: 'abcdef1234567890', mode: 'peer' }
+    ],
+    transports: [],
+    links: [],
+    sources: [
+      { name: 'sensor', zid: '1234567890abcdef', status: 'ok' },
+      { name: 'sensor', zid: 'abcdef1234567890', status: 'ok' }
+    ]
+  };
+
+  const nodes = toCytoscapeElements(duplicateNames)
+    .filter((element) => element.group === 'nodes');
+  assert.equal(nodes.length, 2);
+  assert.deepEqual(
+    nodes.map((node) => node.data.label).sort(),
+    ['sensor (123456…cdef)', 'sensor (abcdef…7890)']
+  );
+});
+
 test('link IDs stay stable when snapshot order changes', () => {
   const first = {
     schema: 'hakoniwa.zenoh.topology/v2',
